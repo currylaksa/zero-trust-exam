@@ -1,0 +1,201 @@
+############################################################
+# Phase 4 Test Suite - Exam Management APIs
+# Project: Zero-Trust Based Secure Online Examination System
+# Tool: VS Code REST Client Extension
+#
+# HOW TO USE:
+# 1) Start backend on http://localhost:5001
+# 2) Open this file in VS Code
+# 3) Run each request in order from top to bottom
+# 4) Do NOT skip steps that set variables (tokens/examId)
+#
+# IMPORTANT PRE-CHECKS (based on current backend code):
+# - Ensure exams routes are mounted in backend/server.js:
+#     app.use('/api/exams', require('./routes/exams'));
+# - Ensure route param names match controller expectations:
+#     routes currently use ':id' but controller reads 'exam_id'
+#     (mismatch can cause 404 for ID-based exam endpoints)
+############################################################
+
+@baseUrl = http://localhost:5001
+
+# Runtime variables populated automatically by response handlers below
+@lecturerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoibGVjdHVyZXJAdXRtLm15Iiwicm9sZSI6ImxlY3R1cmVyIiwiaXAiOiI6OmZmZmY6MTI3LjAuMC4xIiwiaWF0IjoxNzc0NDE2MTIzLCJleHAiOjE3NzQ0MTcwMjN9.X-XFj3Si5OrDBtEoGtCe0UNXo6vPUiLpL9GldVlOt3g
+@studentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic3R1ZGVudDFAdXRtLm15Iiwicm9sZSI6InN0dWRlbnQiLCJpcCI6Ijo6ZmZmZjoxMjcuMC4wLjEiLCJpYXQiOjE3NzQ0MTYxNDQsImV4cCI6MTc3NDQxNzA0NH0.AymEZqFKcNjyisOvdo1CZKzNTOgURTlQva4TWNdxQ60
+@examId = 1
+
+############################################################
+# 1) AUTH SETUP - Login as seed Lecturer
+# Expected: 200 OK and token returned in response body as `token`
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+# > {%
+#   // Save lecturer JWT for all privileged lecturer endpoints
+#   client.global.set("lecturerToken", response.body.token);
+# %}
+
+###
+
+############################################################
+# 2) AUTH SETUP - Login as seed Student
+# Expected: 200 OK and token returned in response body as `token`
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+# > {%
+#   // Save student JWT for student-access and security-negative tests
+#   client.global.set("studentToken", response.body.token);
+# %}
+
+###
+
+############################################################
+# 3) LECTURER ACTION - Create new exam
+# Endpoint: POST /api/exams
+# Auth: Lecturer token
+# Expected: 201 Created, response includes `exam_id`
+# Output: Saves `exam_id` into @examId for later requests
+############################################################
+POST {{baseUrl}}/api/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Phase 4 API Validation Exam",
+  "description": "Created from REST Client phase4_tests.http",
+  "duration": 60,
+  "start_time": "2026-03-26 09:00:00",
+  "end_time": "2026-03-26 10:00:00"
+}
+
+# > {%
+#   // Capture created exam ID for all exam-scoped tests
+#   client.global.set("examId", response.body.exam_id);
+# %}
+
+###
+
+############################################################
+# 4) LECTURER ACTION - Add question to exam
+# Endpoint: POST /api/exams/{{examId}}/questions
+# Auth: Lecturer token
+# Expected: 201 Created, response includes `question_id`
+############################################################
+POST {{baseUrl}}/api/exams/{{examId}}/questions
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "question_text": "What is the capital city of Malaysia?",
+  "question_type": "mcq",
+  "options": ["Kuala Lumpur", "Johor Bahru", "Penang", "Ipoh"],
+  "correct_answer": "Kuala Lumpur"
+}
+
+###
+
+############################################################
+# 5) LECTURER ACTION - Get all exams
+# Endpoint: GET /api/exams
+# Auth: Lecturer token
+# Expected: 200 OK
+# Verify: Response should include exams created by this lecturer
+############################################################
+GET {{baseUrl}}/api/exams
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 6) LECTURER ACTION - Get specific exam by ID
+# Endpoint: GET /api/exams/{{examId}}
+# Auth: Lecturer token
+# Expected: 200 OK with exam details + questions array
+############################################################
+GET {{baseUrl}}/api/exams/{{examId}}
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 7) LECTURER ACTION - Update exam status to "published"
+# Endpoint: PUT /api/exams/{{examId}}
+# Auth: Lecturer token
+# Expected: 200 OK and returned exam object with status=published
+############################################################
+PUT {{baseUrl}}/api/exams/{{examId}}
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "status": "published"
+}
+
+###
+
+############################################################
+# 8) STUDENT ACTION - Get all questions for exam
+# Endpoint: GET /api/exams/{{examId}}/questions
+# Auth: Student token
+# Expected: 200 OK
+# ZERO-TRUST CHECK:
+# - Manually verify each question object DOES NOT contain `correct_answer`
+# - Student must never receive answer keys before/while taking exam
+############################################################
+GET {{baseUrl}}/api/exams/{{examId}}/questions
+Authorization: Bearer {{studentToken}}
+
+###
+
+############################################################
+# 9) SECURITY TEST - Student tries to create exam
+# Endpoint: POST /api/exams
+# Auth: Student token
+# Expected: 403 Forbidden (blocked by role middleware)
+############################################################
+POST {{baseUrl}}/api/exams
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "title": "Unauthorized Student Exam",
+  "description": "This should fail with 403",
+  "duration": 30
+}
+
+###
+
+############################################################
+# 10) SECURITY TEST - Student tries to delete exam
+# Endpoint: DELETE /api/exams/{{examId}}
+# Auth: Student token
+# Expected: 403 Forbidden (blocked by role middleware)
+############################################################
+DELETE {{baseUrl}}/api/exams/{{examId}}
+Authorization: Bearer {{studentToken}}
+
+###
+
+############################################################
+# 11) LECTURER ACTION - Delete exam (cleanup)
+# Endpoint: DELETE /api/exams/{{examId}}
+# Auth: Lecturer token
+# Expected: 200 OK with success message
+# Purpose: Keep database clean after test suite
+############################################################
+DELETE {{baseUrl}}/api/exams/{{examId}}
+Authorization: Bearer {{lecturerToken}}
+

@@ -1,0 +1,123 @@
+@baseUrl = http://localhost:5001/api
+
+### =========================================================================
+### SETUP / GET TOKENS (Run these first sequentially!)
+### =========================================================================
+
+# @name loginStudent
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+### Store Student Token 
+@studentToken = {{loginStudent.response.body.token}}
+
+###
+
+# @name loginLecturer
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+### Store Lecturer Token
+@lecturerToken = {{loginLecturer.response.body.token}}
+
+###
+
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin1@utm.my",
+  "password": "Password123!"
+}
+
+### Store Admin Token
+@adminToken = {{loginAdmin.response.body.token}}
+
+
+### =========================================================================
+### Phase 8.2 Testing
+### =========================================================================
+
+### Step 2: Test GET /api/courses as student
+# Expected: 200 OK. Array containing SECS4234 and SECS3234 (no enrollment_count field, just course data).
+GET {{baseUrl}}/courses
+Authorization: Bearer {{studentToken}}
+
+
+### Step 3: Test GET /api/courses as lecturer
+# Expected: 200 OK. Both courses are shown, and each course should include 
+# an `enrollment_count` field showing 2 for SECS4234 and 1 for SECS3234.
+GET {{baseUrl}}/courses
+Authorization: Bearer {{lecturerToken}}
+
+
+### Step 4a: Test POST /api/courses (Create successfully)
+# Expected: 201 Created.
+POST {{baseUrl}}/courses
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{ 
+    "course_code": "SECS5001", 
+    "course_name": "Test Course" 
+}
+
+### Step 4b: Test POST /api/courses (Duplicate prevention)
+# Expected: 409 Conflict (Course code already exists).
+POST {{baseUrl}}/courses
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{ 
+    "course_code": "SECS5001", 
+    "course_name": "Test Course" 
+}
+
+
+### Step 5a: Test POST /api/courses/:id/enroll (Success)
+# Expected: 201 Created (Enroll student 3 into course 2).
+POST {{baseUrl}}/courses/2/enroll
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ 
+    "user_id": 3 
+}
+
+### Step 5b: Test POST /api/courses/:id/enroll (Duplicate)
+# Expected: 409 Conflict.
+POST {{baseUrl}}/courses/2/enroll
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ 
+    "user_id": 3 
+}
+
+
+### Step 6: Test role protection (Student tries to enroll)
+# Expected: 403 Forbidden.
+POST {{baseUrl}}/courses/2/enroll
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{ 
+    "user_id": 3 
+}
+
+
+### Step 7: Test DELETE enrollment
+# Expected: 200 OK. Row deleted from CourseEnrollment for student 3 in course 2.
+DELETE {{baseUrl}}/courses/2/students/3
+Authorization: Bearer {{adminToken}}

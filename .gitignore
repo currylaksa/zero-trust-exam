@@ -1,0 +1,26 @@
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Misc
+*.local

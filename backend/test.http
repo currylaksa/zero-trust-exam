@@ -1,0 +1,76 @@
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "student_01",
+  "email": "student_01@example.com",
+  "password": "SecurePassword123!",
+  "role": "student"
+}
+
+###
+
+POST http://localhost:5001/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student_01@example.com",
+  "password": "SecurePassword123!"
+}
+
+### REGISTER THE LECTURER
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "DrAhmad",
+  "email": "lecturer@utm.my",
+  "password": "Password123!",
+  "role": "lecturer"
+}
+
+###
+
+### REGISTER THE STUDENT
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "StudentAli",
+  "email": "student1@utm.my",
+  "password": "Password123!",
+  "role": "student"
+}
+
+### REGISTER THE Chan Qing Yee
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "qingyee",
+  "email": "qingyee0219@gmail.com",
+  "password": "Abc@123",
+  "role": "student"
+}
+
+### REGISTER THE Admin
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "admin1",
+  "email": "admin1@utm.my",
+  "password": "Password123!",
+  "role": "admin"
+}
+
+### REGISTER THE STUDENT
+POST http://localhost:5001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "StudentAbu",
+  "email": "student2@utm.my",
+  "password": "Password123!",
+  "role": "student"
+}

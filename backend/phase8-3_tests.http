@@ -1,0 +1,158 @@
+@baseUrl = http://localhost:5001/api
+
+### =========================================================================
+### SETUP / GET TOKENS
+### =========================================================================
+
+# @name loginStudent1
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+### Store Student1 Token
+@student1Token = {{loginStudent1.response.body.token}}
+
+###
+
+# @name loginStudent2
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "student2@utm.my",
+  "password": "Password123!"
+}
+
+### Store Student2 Token
+@student2Token = {{loginStudent2.response.body.token}}
+
+###
+
+# @name loginLecturer
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+### Store Lecturer Token
+@lecturerToken = {{loginLecturer.response.body.token}}
+
+
+### =========================================================================
+### PRE-TEST SETUP: CREATE EXAMS SO YOU HAVE DATA TO TEST WITH
+### =========================================================================
+
+### A) Create an Exam for Course 1
+# @name createExamCourse1
+POST {{baseUrl}}/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Network Security Midterm (Course 1)",
+  "duration": 60,
+  "course_id": 1,
+  "status": "published"
+}
+
+### Store Course 1 Exam ID
+@course1ExamId = {{createExamCourse1.response.body.exam_id}}
+
+
+### B) Create an Exam for Course 2
+# @name createExamCourse2
+POST {{baseUrl}}/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Cryptography Quiz (Course 2)",
+  "duration": 30,
+  "course_id": 2,
+  "status": "published"
+}
+
+### Store Course 2 Exam ID
+@course2ExamId = {{createExamCourse2.response.body.exam_id}}
+
+
+### =========================================================================
+### Phase 8.3 Testing
+### =========================================================================
+
+### Step 1a: Test GET /api/exams as student2 (Only course 1)
+# Expected: 200 OK. Contains ONLY exams where course_id = 1 or course_id = NULL.
+GET {{baseUrl}}/exams
+Authorization: Bearer {{student2Token}}
+
+
+### Step 1b: Test GET /api/exams as student1 (Course 1 & 2)
+# Expected: 200 OK. Contains BOTH exams from course 1 and course 2.
+GET {{baseUrl}}/exams
+Authorization: Bearer {{student1Token}}
+
+
+### Step 2: Verify getExamById blocks unenrolled students
+# Use the exam_id from course 2 we just created.
+# Expected: 403 Forbidden "You are not enrolled in this course".
+GET {{baseUrl}}/exams/{{course2ExamId}}
+Authorization: Bearer {{student2Token}}
+
+
+### Step 3: Verify startSession blocks unenrolled students
+# Use that same course 2 exam_id.
+# Expected: 403 Forbidden "You are not enrolled in this course".
+POST {{baseUrl}}/sessions/start/{{course2ExamId}}
+Authorization: Bearer {{student2Token}}
+
+
+### Step 4: Verify exam time window
+# We will use the Course 1 Exam and try to start it before its open time.
+# First, you must update the start_time of exam `course1ExamId` to a future date in phpMyAdmin!
+# Expected: 400 Bad Request "The exam has not started yet".
+POST {{baseUrl}}/sessions/start/{{course1ExamId}}
+Authorization: Bearer {{student1Token}}
+
+
+### Step 6: Verify createExam accepts course_id (Lecturer)
+# Expected: 201 Created and response shows new exam_id.
+# @name createExamWithCourse
+POST {{baseUrl}}/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Enrollment Test Exam",
+  "duration": 30,
+  "course_id": 1,
+  "status": "published"
+}
+
+### Store new Exam ID
+@newExamId = {{createExamWithCourse.response.body.exam_id}}
+
+
+### Start Session for new Exam (to prepare for step 5 results check)
+# Expected: 201 Created
+# @name startNewSession
+POST {{baseUrl}}/sessions/start/{{newExamId}}
+Authorization: Bearer {{student1Token}}
+
+### Store new Session ID
+@newSessionId = {{startNewSession.response.body.session_id}}
+
+
+### Step 5: Verify results response has new fields
+# Complete an exam as student1, then check results. 
+# We'll use the session we just created.
+# Expected: 200 OK. JSON should include:
+# stats: { ..., total_marks, earned_marks, is_fully_graded }
+GET {{baseUrl}}/sessions/{{newSessionId}}/results
+Authorization: Bearer {{student1Token}}

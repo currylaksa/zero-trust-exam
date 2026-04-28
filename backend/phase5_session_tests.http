@@ -1,0 +1,256 @@
+# Phase 5.1 & 5.2 Test Suite - Exam Session APIs (Zero-Trust)
+# Tool: VS Code REST Client Extension
+#
+# Purpose:
+# - Verify your Phase 5 Session Controller + Session Routes work end-to-end.
+# - Create a *published* exam first (because Session start requires published exams).
+# - Then exercise the student session workflow and a couple of security/edge cases.
+#
+# Run instructions:
+# 1) Start your backend on http://localhost:5001
+# 2) Open this file in VS Code
+# 3) Run requests in order (top to bottom)
+# 4) Do NOT skip requests that populate variables (tokens, examId, sessionId)
+#
+# Important project note (based on current repo state):
+# - Your session endpoints are defined in `backend/routes/sessions.js`.
+# - They must be mounted in `backend/server.js` as:
+#     app.use('/api/sessions', require('./routes/sessions'));
+#   If the mount is missing, these requests will fail with 404.
+
+@baseUrl = http://localhost:5001
+
+# -----------------------------
+# Global variables (populated at runtime)
+# -----------------------------
+@lecturerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoibGVjdHVyZXJAdXRtLm15Iiwicm9sZSI6ImxlY3R1cmVyIiwiaXAiOiI6OmZmZmY6MTI3LjAuMC4xIiwiaWF0IjoxNzc0NDUwNjI1LCJleHAiOjE3NzQ0NTE1MjV9._Bo_B_8ugnI5lWouUQLGkiKwkSqrtgU0AwHiHpI20KU
+@studentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic3R1ZGVudDFAdXRtLm15Iiwicm9sZSI6InN0dWRlbnQiLCJpcCI6Ijo6ZmZmZjoxMjcuMC4wLjEiLCJpYXQiOjE3NzQ0NTA2NzksImV4cCI6MTc3NDQ1MTU3OX0.ihfVEi_iONwrsp_cGMIG_m7OJnbVGopQHU6-VuN2JAk
+
+@examId = 4
+@sessionId = 4
+
+# Manual variable required by this test plan:
+# - You MUST copy `question_id` from the "Get Questions" response into this variable.
+@questionId = 5
+
+############################################################
+### SETUP ###
+############################################################
+
+############################################################
+# 1) Login as Lecturer
+# POST /api/auth/login
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+# > {% ... %} blocks are REST Client scripts.
+# This stores the Lecturer JWT into the global variable `lecturerToken`.
+# > {% client.global.set("lecturerToken", response.body.token); %}
+###
+
+############################################################
+# 2) Create a new exam and ensure status is "published"
+#
+# Endpoint expectations (based on your controllers):
+# - POST /api/exams creates an Exam with default `status = 'draft'`
+#   because `createExam` does NOT apply req.body.status.
+# - Therefore we:
+#   (2a) create the exam via POST (capture exam_id into @examId)
+#   (2b) publish it via PUT /api/exams/{{examId}} with { "status": "published" }
+############################################################
+POST {{baseUrl}}/api/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Phase 5.3 Session API Validation Exam",
+  "description": "Created by backend/phase5_session_tests.http",
+  "duration": 60,
+  "status": "published"
+}
+
+# Save exam_id for later requests.
+# > {% client.global.set("examId", response.body.exam_id); %}
+###
+
+PUT {{baseUrl}}/api/exams/{{examId}}
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "status": "published"
+}
+###
+
+############################################################
+# 3) Add an MCQ question to {{examId}}
+# POST /api/exams/{{examId}}/questions
+############################################################
+POST {{baseUrl}}/api/exams/{{examId}}/questions
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "question_text": "What is the capital city of Malaysia?",
+  "question_type": "mcq",
+  "options": ["Kuala Lumpur", "Johor Bahru", "Penang", "Ipoh"],
+  "correct_answer": "Kuala Lumpur"
+}
+###
+
+############################################################
+# 4) Login as Student
+# POST /api/auth/login
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+# Store Student JWT into `studentToken` for all session tests below.
+# > {% client.global.set("studentToken", response.body.token); %}
+###
+
+############################################################
+### CORE SESSION TESTS (Use studentToken for all) ###
+############################################################
+
+############################################################
+# 5) Start Session
+# POST /api/sessions/start/{{examId}}
+# Expected: 201 Created
+# Output:
+# - response.body.session_id is saved to @sessionId
+############################################################
+POST {{baseUrl}}/api/sessions/start/{{examId}}
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+# startSession controller does not require a request body,
+# but REST Client may send an empty JSON object safely.
+{}
+
+# > {% client.global.set("sessionId", response.body.session_id); %}
+###
+
+############################################################
+# 6) Get Questions
+# GET /api/sessions/{{sessionId}}/questions
+#
+# Expected: 200 OK with an array of questions.
+#
+# IMPORTANT MANUAL STEP (required by this test plan):
+# - Manually grab `question_id` from the response JSON.
+# - Copy that numeric value into:
+#     @questionId
+############################################################
+GET {{baseUrl}}/api/sessions/{{sessionId}}/questions
+Authorization: Bearer {{studentToken}}
+###
+
+############################################################
+# 7) Save Answer
+# POST /api/sessions/{{sessionId}}/answer
+#
+# Expected: 200 OK
+# Body:
+# - question_id: use your manually copied @questionId
+# - answer_text: choose any string; scoring happens on submit for MCQ
+############################################################
+POST {{baseUrl}}/api/sessions/{{sessionId}}/answer
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "question_id": {{questionId}},
+  "answer_text": "Kuala Lumpur"
+}
+###
+
+############################################################
+# 8) Heartbeat
+# POST /api/sessions/{{sessionId}}/heartbeat
+#
+# Expected: 200 OK
+############################################################
+POST {{baseUrl}}/api/sessions/{{sessionId}}/heartbeat
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{}
+###
+
+############################################################
+# 9) Zero-Trust Trigger (TAB_SWITCH)
+# POST /api/sessions/{{sessionId}}/log
+#
+# Expected: 200 OK with { "logged": true }
+############################################################
+POST {{baseUrl}}/api/sessions/{{sessionId}}/log
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "activity_type": "TAB_SWITCH",
+  "description": "REST Client test: tab switch simulation"
+}
+###
+
+############################################################
+# 10) Submit Exam
+# POST /api/sessions/{{sessionId}}/submit
+#
+# Expected: 200 OK
+############################################################
+POST {{baseUrl}}/api/sessions/{{sessionId}}/submit
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{}
+###
+
+############################################################
+### SECURITY / EDGE CASE TESTS ###
+############################################################
+
+############################################################
+# 11) Double Start
+# Try starting the same exam again.
+#
+# Expected (per your scenario request): 409 Conflict
+#
+# Note:
+# - The current `startSession` logic blocks only sessions that are still
+#   `status = 'in_progress'` for that user+exam.
+# - If your implementation marks the previous attempt as `completed` (as
+#   `submitExam` does), then a new session start may return 201 instead.
+############################################################
+POST {{baseUrl}}/api/sessions/start/{{examId}}
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{}
+###
+
+############################################################
+# 12) Post-Submit Heartbeat
+# After submission, attempt to send a heartbeat.
+#
+# Expected (per your scenario request): 400 Bad Request
+############################################################
+POST {{baseUrl}}/api/sessions/{{sessionId}}/heartbeat
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{}
+###
+

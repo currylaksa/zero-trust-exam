@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --utm-primary:   #7A1F2E;
+  --utm-hover:     #601826;
+  --utm-light:     #FFF1F2;
+  --utm-orange:    #D4500A;
+  --utm-maroon-50: #FFF5F5;
+}
+
+.btn-primary {
+  background-color: var(--utm-primary);
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: var(--utm-hover);
+}
+
+@layer base {
+  button,
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+}

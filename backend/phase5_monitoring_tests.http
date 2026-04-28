@@ -1,0 +1,244 @@
+############################################################
+# Phase 5.3 Test Suite - Monitoring APIs (Zero-Trust)
+# Project: Zero-Trust Based Secure Online Examination System
+# Tool: VS Code REST Client Extension
+# Backend: http://localhost:5001
+#
+# HOW TO USE:
+# 1) Make sure backend server is running on port 5001.
+# 2) Open this file in VS Code.
+# 3) Run requests from top to bottom IN ORDER.
+# 4) Do not skip login requests because they populate JWT variables.
+#
+# WHY THIS ORDER MATTERS:
+# - Lecturer token is required for all monitoring dashboard endpoints.
+# - Student token is required for role-based access denial tests.
+# - Alert review endpoint needs alertId captured from the Alerts response.
+############################################################
+
+@baseUrl = http://localhost:5001
+
+# Runtime variables populated by script blocks below.
+# Start as empty to avoid stale values from previous runs.
+@lecturerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoibGVjdHVyZXJAdXRtLm15Iiwicm9sZSI6ImxlY3R1cmVyIiwiaXAiOiI6OmZmZmY6MTI3LjAuMC4xIiwiaWF0IjoxNzc0NDUwNjI1LCJleHAiOjE3NzQ0NTE1MjV9._Bo_B_8ugnI5lWouUQLGkiKwkSqrtgU0AwHiHpI20KU
+@studentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic3R1ZGVudDFAdXRtLm15Iiwicm9sZSI6InN0dWRlbnQiLCJpcCI6Ijo6ZmZmZjoxMjcuMC4wLjEiLCJpYXQiOjE3NzQ0NTA2NzksImV4cCI6MTc3NDQ1MTU3OX0.ihfVEi_iONwrsp_cGMIG_m7OJnbVGopQHU6-VuN2JAk
+@alertId = 1
+
+############################################################
+# === SETUP (AUTHENTICATION) ===
+############################################################
+
+############################################################
+# 1) Login as Lecturer
+# Endpoint: POST /api/auth/login
+# Credentials: lecturer@utm.my / Password123!
+# Expected: 200 OK with response.body.token
+# Action: Save token to global variable `lecturerToken`
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+# > {%
+#   // Basic status verification for fast feedback in REST Client output.
+#   client.test("Lecturer login returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+
+#   // Save JWT for subsequent lecturer-only monitoring requests.
+#   if (response.body && response.body.token) {
+#     client.global.set("lecturerToken", response.body.token);
+#   }
+# %}
+
+###
+
+############################################################
+# 2) Login as Student
+# Endpoint: POST /api/auth/login
+# Credentials: student1@utm.my / Password123!
+# Expected: 200 OK with response.body.token
+# Action: Save token to global variable `studentToken`
+# Note: This token is used later to verify student role is denied.
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+# > {%
+#   client.test("Student login returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+
+#   // Save JWT for security-negative tests.
+#   if (response.body && response.body.token) {
+#     client.global.set("studentToken", response.body.token);
+#   }
+# %}
+
+###
+
+############################################################
+# === LECTURER ACTIONS (Use @lecturerToken for all) ===
+############################################################
+
+############################################################
+# 3) Get Active Sessions
+# Endpoint: GET /api/monitoring/sessions
+# Auth: Lecturer token
+# Expected: 200 OK
+# Expected payload: Array of ExamSession rows with status='in_progress'
+# Includes: tab_switch_count, fullscreen_exit_count, student username/email,
+#           and exam_title (via joins)
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+Authorization: Bearer {{lecturerToken}}
+
+# > {%
+#   client.test("Get Active Sessions returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+# %}
+
+###
+
+############################################################
+# 4) Get Alerts
+# Endpoint: GET /api/monitoring/alerts
+# Auth: Lecturer token
+# Expected: 200 OK
+# Expected payload: Array of unreviewed FlaggedActivity rows
+#
+# CRITICAL SCRIPT BEHAVIOR:
+# - Extract the FIRST alert's flag_id from response.body[0].flag_id.
+# - Save into global variable `alertId`.
+# - Guard with `if (response.body.length > 0)` to prevent runtime errors
+#   when there are currently no alerts.
+############################################################
+GET {{baseUrl}}/api/monitoring/alerts
+Authorization: Bearer {{lecturerToken}}
+
+# > {%
+#   client.test("Get Alerts returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+
+#   // Defensive extraction to avoid crashes when alert list is empty.
+#   if (Array.isArray(response.body) && response.body.length > 0) {
+#     client.global.set("alertId", response.body[0].flag_id);
+#   }
+# %}
+
+###
+
+############################################################
+# 5) Get Audit Logs (No Filters)
+# Endpoint: GET /api/monitoring/audit-logs
+# Auth: Lecturer token
+# Expected: 200 OK
+# Expected payload: Up to 100 most recent activity logs (default limit)
+############################################################
+GET {{baseUrl}}/api/monitoring/audit-logs
+Authorization: Bearer {{lecturerToken}}
+
+# > {%
+#   client.test("Get Audit Logs (default) returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+# %}
+
+###
+
+############################################################
+# 6) Get Audit Logs (With Filters)
+# Endpoint: GET /api/monitoring/audit-logs?activity_type=TAB_SWITCH&limit=5
+# Auth: Lecturer token
+# Expected: 200 OK
+# Expected payload: Only TAB_SWITCH logs, capped at 5 rows
+############################################################
+GET {{baseUrl}}/api/monitoring/audit-logs?activity_type=TAB_SWITCH&limit=5
+Authorization: Bearer {{lecturerToken}}
+
+# > {%
+#   client.test("Get Audit Logs (filtered) returns 200", function () {
+#     client.assert(response.status === 200, "Expected HTTP 200");
+#   });
+# %}
+
+###
+
+############################################################
+# 7) Mark Alert as Reviewed
+# Endpoint: PUT /api/monitoring/alerts/{{alertId}}/review
+# Auth: Lecturer token
+# Expected: 200 OK with success message
+#
+# IMPORTANT NOTE:
+# - This request depends on step 4 successfully capturing `alertId`.
+# - If there were no alerts in step 4, `alertId` remains empty.
+# - In that case, this request can fail (typically 404, or 500 depending on
+#   route handling/input parsing behavior).
+############################################################
+PUT {{baseUrl}}/api/monitoring/alerts/{{alertId}}/review
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{}
+
+# > {%
+#   // This assertion expects the happy path where alertId is valid.
+#   // If alertId is empty, status may be non-200 as described above.
+#   client.test("Mark Alert Reviewed returns 200 when alertId exists", function () {
+#     if (client.global.get("alertId")) {
+#       client.assert(response.status === 200, "Expected HTTP 200 with valid alertId");
+#     }
+#   });
+# %}
+
+###
+
+############################################################
+# === SECURITY / ZERO-TRUST TESTS (Use @studentToken) ===
+############################################################
+
+############################################################
+# 8) Security Test - Student Accesses Sessions
+# Endpoint: GET /api/monitoring/sessions
+# Auth: Student token
+# Expected: 403 Forbidden
+# Reason: Role middleware only allows lecturer/admin for monitoring routes
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+Authorization: Bearer {{studentToken}}
+
+# > {%
+#   client.test("Student blocked from /monitoring/sessions with 403", function () {
+#     client.assert(response.status === 403, "Expected HTTP 403 Forbidden");
+#   });
+# %}
+
+###
+
+############################################################
+# 9) Security Test - Student Accesses Logs
+# Endpoint: GET /api/monitoring/audit-logs
+# Auth: Student token
+# Expected: 403 Forbidden
+# Reason: Role middleware only allows lecturer/admin for monitoring routes
+############################################################
+GET {{baseUrl}}/api/monitoring/audit-logs
+Authorization: Bearer {{studentToken}}
+
+# > {%
+#   client.test("Student blocked from /monitoring/audit-logs with 403", function () {
+#     client.assert(response.status === 403, "Expected HTTP 403 Forbidden");
+#   });
+# %}

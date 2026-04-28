@@ -1,0 +1,56 @@
+@baseUrl = http://localhost:5001/api
+
+### =========================================================================
+### SETUP / GET TOKENS
+### =========================================================================
+
+# @name loginLecturer
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+### Store Lecturer Token
+@lecturerToken = {{loginLecturer.response.body.token}}
+
+
+### =========================================================================
+### Phase 8.4 Testing - Test marks values
+### =========================================================================
+
+### Create a placeholder Exam first
+# @name createExam
+POST {{baseUrl}}/exams
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "title": "Marks Integration Test",
+  "duration": 60,
+  "status": "draft"
+}
+
+### Store the exam id explicitly
+@examId = {{createExam.response.body.exam_id}}
+
+
+### Step 2 & 5: Verify Marks are accepted by the backend correctly
+# Submitting a question with `marks: 5`.
+POST {{baseUrl}}/exams/{{examId}}/questions
+Authorization: Bearer {{lecturerToken}}
+Content-Type: application/json
+
+{
+  "question_text": "What is the result of 2 + 3?",
+  "question_type": "short_answer",
+  "marks": 5
+}
+
+
+### Verify Marks persistence on GET
+# Expected: array should include our question with "marks" = 5
+GET {{baseUrl}}/exams/{{examId}}/questions
+Authorization: Bearer {{lecturerToken}}
