@@ -99,9 +99,12 @@ const getAllExams = async (req, res) => {
     const params = [];
 
     if (req.user.role === 'student') {
+      // Students only see published exams for courses they're enrolled in.
+      // Exams with course_id=NULL are intentionally hidden — there is no
+      // "public exam" feature, so a NULL binding is treated as misconfiguration.
       query += `
         WHERE e.status = ?
-        AND (e.course_id IS NULL OR e.course_id IN (SELECT course_id FROM CourseEnrollment WHERE user_id = ?))
+        AND e.course_id IN (SELECT course_id FROM CourseEnrollment WHERE user_id = ?)
       `;
       params.push('published', req.user.user_id);
     } else if (req.user.role === 'lecturer') {

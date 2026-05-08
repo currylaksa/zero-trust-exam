@@ -111,8 +111,20 @@ const Results = () => {
               <div className="mt-2 flex items-baseline">
                 {stats.is_fully_graded ? (
                    <>
-                     <span className={`text-3xl font-bold ${Math.round((stats.earned_marks / stats.total_marks) * 100) >= 50 ? 'text-green-600' : 'text-red-600'}`}>{stats.earned_marks}</span>
-                     <span className="text-gray-500 ml-1 text-lg">/ {stats.total_marks} ({Math.round((stats.earned_marks / stats.total_marks) * 100)}%)</span>
+                     {(() => {
+                       const pct = stats.total_marks > 0
+                         ? Math.round((stats.earned_marks / stats.total_marks) * 100)
+                         : 0;
+                       const colorCls = stats.total_marks > 0
+                         ? (pct >= 50 ? 'text-green-600' : 'text-red-600')
+                         : 'text-gray-600';
+                       return (
+                         <>
+                           <span className={`text-3xl font-bold ${colorCls}`}>{stats.earned_marks}</span>
+                           <span className="text-gray-500 ml-1 text-lg">/ {stats.total_marks} ({pct}%)</span>
+                         </>
+                       );
+                     })()}
                    </>
                 ) : (
                    <>

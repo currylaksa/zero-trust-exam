@@ -93,7 +93,7 @@ const MonitoringPanel = () => {
   };
 
   // Derived metrics
-  const activeSessionsCount = sessions.filter(s => s.status === 'active' || s.status === 'in_progress' || s.status === 'flagged').length;
+  const activeSessionsCount = sessions.filter(s => s.status === 'in_progress' || s.status === 'flagged').length;
   const unreviewedAlertsCount = alerts.filter(a => !a.reviewed_at && !a.reviewed).length;
   // Approximation based on alerts array, total flagged today could be fetched separately or calculated if alerts has timestamp 
   const totalFlaggedTodayCount = alerts.length; 

@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
 const {
   sendExamStartedEmail,
   sendExamSubmittedEmail,
@@ -825,7 +826,6 @@ const getExamSubmissions = async (req, res) => {
     if (examRows.length === 0) return res.status(404).json({ message: 'Exam not found' });
     
     if (req.user.role !== 'admin' && Number(examRows[0].created_by) !== Number(req.user.user_id)) {
-       console.log(`Forbidden: Lecturer ${req.user.user_id} tried to access exam created by ${examRows[0].created_by}`);
        return res.status(403).json({ message: 'Forbidden' });
     }
 
@@ -922,7 +922,7 @@ const getExamSubmissions = async (req, res) => {
 
 const gradeAnswer = async (req, res) => {
   const { sessionId, answerId } = req.params;
-  const { score, feedback } = req.body;
+  const { score } = req.body;
 
   try {
     const [answerData] = await db.execute(`
@@ -945,7 +945,6 @@ const gradeAnswer = async (req, res) => {
     }
 
     const numericScore = Number(score);
-    console.log(`[gradeAnswer] sessionId: ${sessionId}, answerId: ${answerId}, score: ${score}, numericScore: ${numericScore}, marks: ${marks}, score type: ${typeof score}`);
     if (isNaN(numericScore) || numericScore < 0 || numericScore > marks) {
       return res.status(400).json({ message: `Score must be between 0 and ${marks}` });
     }
@@ -974,8 +973,6 @@ const gradeAnswer = async (req, res) => {
     return res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
-
-const speakeasy = require('speakeasy');
 
 const initiateResume = async (req, res) => {
   const sessionId = req.params.id;
@@ -1063,7 +1060,8 @@ const verifyResume = async (req, res) => {
     const verified = speakeasy.totp.verify({
       secret: users[0].mfa_secret,
       encoding: 'base32',
-      token: otp
+      token: otp,
+      window: 1
     });
 
     if (!verified) {

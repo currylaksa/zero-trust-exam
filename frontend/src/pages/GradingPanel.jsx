@@ -237,11 +237,11 @@ const GradingPanel = () => {
                                             type="number"
                                             min="0"
                                             max={q.marks}
-                                            value={scores[q.answer_id || q.question_id] !== undefined ? scores[q.answer_id || q.question_id] : ''}
-                                            onChange={(e) => handleScoreChange(q.answer_id || q.question_id, e.target.value)}
+                                            value={scores[q.answer_id] !== undefined ? scores[q.answer_id] : ''}
+                                            onChange={(e) => handleScoreChange(q.answer_id, e.target.value)}
                                             className="w-20 p-2 border border-blue-300 rounded shadow-sm text-sm focus:ring-[#7A1F2E] focus:border-[#7A1F2E]"
                                             placeholder="Score"
-                                            disabled={q.is_nullified}
+                                            disabled={q.is_nullified || !q.answer_id}
                                           />
                                           <span className="ml-2 text-sm text-gray-600">/ {q.marks}</span>
                                         </div>
@@ -249,7 +249,7 @@ const GradingPanel = () => {
                                       <div className="pt-4 flex items-center space-x-3">
                                         {!q.is_nullified && (
                                           <button
-                                            onClick={() => saveScore(q.answer_id, q.marks)}
+                                            onClick={() => saveScore(q.answer_id)}
                                             disabled={!q.answer_id} // can't grade if they didn't even submit a row
                                             className={`px-4 py-2 text-sm font-medium text-white rounded bg-[#7A1F2E] hover:bg-[#601826] ${!q.answer_id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                           >

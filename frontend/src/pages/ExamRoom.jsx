@@ -239,6 +239,15 @@ const ExamRoom = () => {
     }, 500);
   };
 
+  // Clear any pending auto-save debounce on unmount so a trailing saveAnswer
+  // does not fire after the component is gone (e.g. timer-driven auto-submit
+  // mid-typing). Cleanup-only effect — no other deps needed.
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-stone-50">
