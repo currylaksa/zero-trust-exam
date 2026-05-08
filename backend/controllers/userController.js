@@ -2,6 +2,8 @@ const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { sendWelcomeEmail } = require('../services/emailService');
 
+const VALID_ROLES = ['student', 'lecturer', 'staff', 'admin'];
+
 exports.getUsers = async (req, res) => {
     try {
         const { search, role } = req.query;
@@ -35,21 +37,46 @@ exports.getUsers = async (req, res) => {
 exports.createUser = async (req, res) => {
     try {
         const { username, email, password, role } = req.body;
+
+        // Input validation — same gate as authController.register
+        if (!username || !email || !password || !role) {
+            return res.status(400).json({ message: 'Missing required fields: username, email, password, role' });
+        }
+        if (!VALID_ROLES.includes(role)) {
+            return res.status(400).json({ message: 'Invalid role' });
+        }
+
+        // Pre-check duplicate email so the client gets a clean 409
+        // instead of a raw SQL ER_DUP_ENTRY 500.
+        const [existingRows] = await pool.query('SELECT user_id FROM User WHERE email = ?', [email]);
+        if (existingRows.length > 0) {
+            return res.status(409).json({ message: 'Email already in use' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const [result] = await pool.query(
             'INSERT INTO User (username, email, password, role) VALUES (?, ?, ?, ?)',
             [username, email, hashedPassword, role]
         );
+        const newId = result.insertId;
+
+        // Mirror authController.register: role-specific child rows so future
+        // JOINs on Student / Admin tables resolve correctly.
+        if (role === 'student') {
+            await pool.query('INSERT INTO Student (user_id) VALUES (?)', [newId]);
+        } else if (role === 'admin') {
+            await pool.query('INSERT INTO Admin (user_id, permissions) VALUES (?, ?)', [newId, null]);
+        }
 
         try {
-            const userEmail = email || username;
-            sendWelcomeEmail({ studentEmail: userEmail, studentName: username, role });
+            sendWelcomeEmail({ studentEmail: email, studentName: username, role });
         } catch (emailErr) {
             console.error('Failed to send welcome email:', emailErr);
         }
 
-        res.status(201).json({ id: result.insertId, username, email, role, mfaEnabled: 0, createdAt: new Date() });
+        res.status(201).json({ id: newId, username, email, role, mfaEnabled: 0, createdAt: new Date() });
     } catch (error) {
+        console.error('Error creating user:', error);
         res.status(500).json({ message: 'Error creating user', error: error.message });
     }
 };
