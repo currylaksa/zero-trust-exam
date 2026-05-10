@@ -1,5 +1,16 @@
 const db = require('../config/db');
 
+// JSON columns are returned as parsed objects on MySQL 8 (native JSON type)
+// and as strings on MariaDB (LONGTEXT). Normalize so the frontend always
+// sees an array. Mirrors the parseOptionsJSON helper in sessionController.
+const parseJSONField = (val) => {
+  if (val === null || val === undefined) return val;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return val; }
+  }
+  return val;
+};
+
 const getActiveSessions = async (req, res) => {
   try {
     const isLecturer = req.user.role === 'lecturer';
@@ -27,7 +38,11 @@ const getActiveSessions = async (req, res) => {
          s.fullscreen_exit_count,
          u.username,
          u.email,
-         e.title AS exam_title
+         e.title AS exam_title,
+         rs.risk_score,
+         rs.risk_level,
+         rs.contributing_factors,
+         rs.scored_at AS risk_scored_at
        FROM ExamSession s
        JOIN User u ON s.user_id = u.user_id
        JOIN Exam e ON s.exam_id = e.exam_id
@@ -38,12 +53,32 @@ const getActiveSessions = async (req, res) => {
          WHERE al.activity_type = 'TAB_SWITCH'
          GROUP BY fa.session_id
        ) ts ON ts.session_id = s.session_id
+       LEFT JOIN (
+         SELECT srs.session_id, srs.risk_score, srs.risk_level,
+                srs.contributing_factors, srs.scored_at
+         FROM SessionRiskScore srs
+         INNER JOIN (
+           SELECT session_id, MAX(scored_at) AS latest
+           FROM SessionRiskScore
+           GROUP BY session_id
+         ) latest_srs
+           ON srs.session_id = latest_srs.session_id
+          AND srs.scored_at = latest_srs.latest
+       ) rs ON rs.session_id = s.session_id
        ${whereClause}
        ORDER BY s.start_time DESC`,
       params
     );
 
-    return res.status(200).json(rows);
+    // Normalize JSON-typed contributing_factors so the frontend always
+    // receives an array (or null), regardless of whether the underlying
+    // driver returned the column as a string or a parsed object.
+    const normalized = rows.map((r) => ({
+      ...r,
+      contributing_factors: parseJSONField(r.contributing_factors),
+    }));
+
+    return res.status(200).json(normalized);
   } catch (err) {
     return res.status(500).json({ message: 'Server error', error: err.message });
   }

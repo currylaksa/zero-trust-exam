@@ -1,0 +1,326 @@
+############################################################
+# Phase 9 Test Suite - Behavioral Risk Scoring (Control #26)
+# Project: Zero-Trust Based Secure Online Examination System
+# Tool: VS Code REST Client Extension
+# Backend: http://localhost:5001
+#
+# HOW TO USE:
+# 1) Start the Python risk-scorer:
+#      cd backend/risk-scoring && source venv/bin/activate && python service.py
+# 2) Start the Node backend on port 5001 (npm run / node server.js).
+# 3) Open this file in VS Code and run requests in order.
+# 4) Section 4 covers the Python service directly; sections 1-3 cover
+#    the Node-side dashboard endpoints introduced in Stage 4.
+#
+# SCOPE OF THIS FILE (stage 4):
+#   1. Authentication setup
+#   2. GET /api/monitoring/sessions  — verify the new risk_* fields
+#   3. GET /api/monitoring/sessions/:id/risk-history  — full coverage
+#   4. Direct Python /score and /health calls (already verified in
+#      Stage 1; included here so the panel demo can re-prove them)
+############################################################
+
+@baseUrl = http://localhost:5001
+@scorerUrl = http://127.0.0.1:8001
+
+# Replace these with values from your local DB after running setup.
+# A session that has accumulated risk-scored ticks via the Stage 3
+# riskScorer cron is the right candidate.
+@lecturerToken = REPLACE_WITH_LECTURER_TOKEN
+@adminToken    = REPLACE_WITH_ADMIN_TOKEN
+@studentToken  = REPLACE_WITH_STUDENT_TOKEN
+@sessionId     = REPLACE_WITH_REAL_SESSION_ID
+@otherLecturerSessionId = REPLACE_WITH_SESSION_OWNED_BY_DIFFERENT_LECTURER
+
+############################################################
+# === SECTION 1: AUTHENTICATION SETUP ===
+############################################################
+
+############################################################
+# 1.1) Login as lecturer
+# Expected: 200, response.body.token (or mfaRequired flow)
+# Capture: lecturerToken
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "lecturer@utm.my",
+  "password": "Password123!"
+}
+
+###
+
+############################################################
+# 1.2) Login as admin
+# Expected: 200, response.body.token
+# Capture: adminToken
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@utm.my",
+  "password": "Password123!"
+}
+
+###
+
+############################################################
+# 1.3) Login as student (used to verify role denial)
+# Expected: 200, response.body.token
+# Capture: studentToken
+############################################################
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@utm.my",
+  "password": "Password123!"
+}
+
+###
+
+############################################################
+# === SECTION 2: getActiveSessions (extended with risk fields) ===
+############################################################
+
+############################################################
+# 2.1) Lecturer fetches active sessions
+# Endpoint: GET /api/monitoring/sessions
+# Expected: 200, array of sessions
+# VERIFY each session row now contains:
+#   - risk_score        (number 0..100, or null if never scored)
+#   - risk_level        ('low' | 'medium' | 'high' | null)
+#   - contributing_factors (array of strings, or null)
+#   - risk_scored_at    (timestamp or null)
+# Lecturers see only sessions for exams they created.
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 2.2) Admin fetches active sessions (broader scope)
+# Endpoint: GET /api/monitoring/sessions
+# Expected: 200, all in_progress + flagged sessions across all exams,
+#           each with the same risk_* fields.
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+Authorization: Bearer {{adminToken}}
+
+###
+
+############################################################
+# 2.3) Student is denied
+# Endpoint: GET /api/monitoring/sessions
+# Expected: 403 Forbidden — students cannot read monitoring data.
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+Authorization: Bearer {{studentToken}}
+
+###
+
+############################################################
+# 2.4) Unauthenticated is denied
+# Endpoint: GET /api/monitoring/sessions
+# Expected: 401 No token provided
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions
+
+###
+
+############################################################
+# === SECTION 3: getSessionRiskHistory (NEW) ===
+############################################################
+
+############################################################
+# 3.1) Lecturer fetches risk history for own session — default limit
+# Endpoint: GET /api/monitoring/sessions/:id/risk-history
+# Expected: 200
+# Response shape:
+#   { session_id: <int>, count: <int>, scores: [
+#       { score_id, risk_score, risk_level, contributing_factors, scored_at },
+#       ...   // chronological ascending (oldest first), suitable for sparkline
+#     ]
+#   }
+# Default limit: 30. count <= 30.
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 3.2) Lecturer fetches risk history with custom limit
+# Endpoint: GET /api/monitoring/sessions/:id/risk-history?limit=5
+# Expected: 200, count <= 5
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history?limit=5
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 3.3) Limit clamping — over-large limit
+# Endpoint: ?limit=9999
+# Expected: 200, count <= 200 (server-side clamp).
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history?limit=9999
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 3.4) Limit clamping — non-numeric falls back to default 30
+# Expected: 200, count <= 30
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history?limit=abc
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 3.5) Admin can fetch any session's history
+# Expected: 200, scores array
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history
+Authorization: Bearer {{adminToken}}
+
+###
+
+############################################################
+# 3.6) Lecturer ownership enforcement
+# A lecturer requesting a session that belongs to a different lecturer's
+# exam should receive 403. Set @otherLecturerSessionId to a real
+# example before running.
+# Expected: 403 Forbidden
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{otherLecturerSessionId}}/risk-history
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+############################################################
+# 3.7) Non-existent session
+# Expected (lecturer): 404 Session not found
+# Expected (admin):    200 with empty scores array (admin bypasses
+#                       ownership check; query returns no rows).
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/999999/risk-history
+Authorization: Bearer {{lecturerToken}}
+
+###
+
+GET {{baseUrl}}/api/monitoring/sessions/999999/risk-history
+Authorization: Bearer {{adminToken}}
+
+###
+
+############################################################
+# 3.8) Student is denied
+# Expected: 403 Forbidden — risk history is invigilator-only.
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history
+Authorization: Bearer {{studentToken}}
+
+###
+
+############################################################
+# 3.9) Unauthenticated is denied
+# Expected: 401 No token provided
+############################################################
+GET {{baseUrl}}/api/monitoring/sessions/{{sessionId}}/risk-history
+
+###
+
+############################################################
+# === SECTION 4: Python scorer direct calls (verified in Stage 1) ===
+# Loopback only. Run these from the droplet (or local dev) — they will
+# fail from any non-127.0.0.1 origin even if reachable, because of the
+# Flask before_request guard.
+############################################################
+
+############################################################
+# 4.1) /health — model loaded
+# Expected: 200, { status: "ok", model_loaded: true, ... }
+############################################################
+GET {{scorerUrl}}/health
+
+###
+
+############################################################
+# 4.2) /score — low-risk payload
+# Expected: 200, risk_score < 30, risk_level: "low",
+#                contributing_factors: ["normal_session"]
+############################################################
+POST {{scorerUrl}}/score
+Content-Type: application/json
+
+{
+  "session_id": 1,
+  "tab_switches": 0,
+  "total_tab_duration_sec": 0,
+  "mfa_reprompts": 0,
+  "heartbeat_count": 30,
+  "session_resumes": 0
+}
+
+###
+
+############################################################
+# 4.3) /score — medium-risk payload
+# Expected: 200, risk_score 50..60, risk_level: "medium",
+#                factors include frequent_tab_switching, long_time_off_tab
+############################################################
+POST {{scorerUrl}}/score
+Content-Type: application/json
+
+{
+  "session_id": 1,
+  "tab_switches": 5,
+  "total_tab_duration_sec": 60,
+  "mfa_reprompts": 1,
+  "heartbeat_count": 18,
+  "session_resumes": 0
+}
+
+###
+
+############################################################
+# 4.4) /score — high-risk payload
+# Expected: 200, risk_score 85..95, risk_level: "high",
+#                factors include frequent_tab_switching, long_time_off_tab,
+#                repeated_step_up_authentication
+############################################################
+POST {{scorerUrl}}/score
+Content-Type: application/json
+
+{
+  "session_id": 1,
+  "tab_switches": 15,
+  "total_tab_duration_sec": 300,
+  "mfa_reprompts": 3,
+  "heartbeat_count": 8,
+  "session_resumes": 2
+}
+
+###
+
+############################################################
+# 4.5) /score — malformed (missing session_resumes)
+# Expected: 400, { error: "missing fields: ['session_resumes']" }
+############################################################
+POST {{scorerUrl}}/score
+Content-Type: application/json
+
+{
+  "session_id": 1,
+  "tab_switches": 1,
+  "total_tab_duration_sec": 2,
+  "mfa_reprompts": 0,
+  "heartbeat_count": 10
+}
+
+###
