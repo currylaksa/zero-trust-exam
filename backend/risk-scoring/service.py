@@ -119,14 +119,78 @@ def _validate_payload(body):
     return np.array(vec, dtype=float).reshape(1, -1), None
 
 
-def _score_to_risk(decision_value):
-    # decision_function: higher = more normal, lower = more anomalous.
-    # Sigmoid: risk = 100 / (1 + exp(k * decision_value)).
-    # k tuned at training time so training p95 maps to low band and
-    # decision_value=0 (boundary between normal and anomalous) maps to 50.
-    k = _artefact.get("sigmoid_k", 6.0)
-    risk = 100.0 / (1.0 + math.exp(k * decision_value))
-    return int(round(max(0.0, min(100.0, risk))))
+def _magnitude_bonus(body):
+    """Linear bonus that scales with how far each feature exceeds its training p95.
+
+    Defeats IsolationForest path-length saturation: in training-tail regions
+    (anything past ~3x the training p95) decision_function plateaus, so a
+    catastrophic session and a moderately anomalous one get nearly identical
+    raw scores. This bonus restores expressiveness by adding a deterministic
+    per-feature contribution that grows linearly with extremeness.
+
+    Bounded total contribution (default cap 30 points). High weights only
+    activate at clearly-extreme inputs because each per-feature contribution
+    needs the value to approach its hard limit.
+    """
+    cfg = _artefact.get("magnitude")
+    if cfg is None:
+        return 0.0
+
+    fp95 = _artefact["feature_p95"]
+    weight = float(cfg.get("weight_per_feature", 14.0))
+    cap = float(cfg.get("max_total", 30.0))
+    hard = cfg.get("hard_limit", {})
+
+    def excess(val, p95, hard_max):
+        denom = max(1e-6, hard_max - p95)
+        return max(0.0, min(1.0, (val - p95) / denom))
+
+    contribs = [
+        excess(body["tab_switches"],
+               fp95["tab_switches"],
+               float(hard.get("tab_switches", 20.0))),
+        excess(body["total_tab_duration_sec"],
+               fp95["total_tab_duration_sec"],
+               float(hard.get("total_tab_duration_sec", 600.0))),
+        excess(body["mfa_reprompts"],
+               fp95["mfa_reprompts"],
+               float(hard.get("mfa_reprompts", 5.0))),
+        excess(body["session_resumes"],
+               fp95["session_resumes"],
+               float(hard.get("session_resumes", 4.0))),
+    ]
+    total = sum(c * weight for c in contribs)
+
+    # Heartbeat count: low is bad (sparse heartbeats).
+    # Linearly map [heartbeat_floor, 0] -> [0, 1] then weight at half by default,
+    # because without a session_duration feature we can't be sure low counts are
+    # genuinely anomalous (a fresh session naturally has few heartbeats).
+    floor = float(cfg.get("heartbeat_floor", 5.0))
+    hb_factor = float(cfg.get("heartbeat_weight_factor", 0.5))
+    hb_excess = max(0.0, min(1.0, (floor - body["heartbeat_count"]) / max(1e-6, floor)))
+    total += hb_excess * weight * hb_factor
+
+    return min(total, cap)
+
+
+def _score_to_risk(decision_value, body):
+    """Combine IsolationForest decision_function (anomaly direction) with a
+    magnitude bonus (severity past training tail) to produce a 0-100 score.
+
+    Sigmoid: base = 100 / (1 + exp(k * (decision_value - shift)))
+      - shift slightly negative anchors the 50% point at a mildly anomalous
+        decision_value (not exactly 0), so well-behaved samples score low.
+      - k controls steepness — too high compresses the response, too low
+        flattens it.
+
+    Magnitude bonus: defeats IF saturation; see _magnitude_bonus().
+    Final risk = base + bonus, clipped to [0, 100].
+    """
+    k = float(_artefact.get("sigmoid_k", 4.0))
+    shift = float(_artefact.get("sigmoid_shift", -0.10))
+    base = 100.0 / (1.0 + math.exp(k * (decision_value - shift)))
+    bonus = _magnitude_bonus(body)
+    return int(round(max(0.0, min(100.0, base + bonus))))
 
 
 def _risk_level(score):
@@ -178,7 +242,7 @@ def score():
         return jsonify({"error": err}), 400
 
     decision = float(_artefact["model"].decision_function(vec)[0])
-    risk_score = _score_to_risk(decision)
+    risk_score = _score_to_risk(decision, body)
     level = _risk_level(risk_score)
     factors = _contributing_factors(body, risk_score)
 
