@@ -1,14 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/useAuth';
 import RoleNavbar from '../components/RoleNavbar';
 import { PageWrapper, PageMain, PageHeading, ErrorAlert } from '../components/ui';
+
+// Risk-band thresholds — must match backend/risk-scoring/service.py LOW_BAND/HIGH_BAND.
+const STALE_SCORE_MS = 90 * 1000;
 
 const MonitoringPanel = () => {
   const [sessions, setSessions] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Control #26 dashboard state.
+  const [sortBy, setSortBy] = useState('risk');               // 'risk' | 'started' | 'tab_switches'
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [riskHistory, setRiskHistory] = useState({ count: 0, scores: [] });
+  const [historyLoading, setHistoryLoading] = useState(false);
   const { user, logout } = useAuth();
 
   const fetchData = async () => {
@@ -33,6 +42,39 @@ const MonitoringPanel = () => {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-derive the live row for the currently selected session every render.
+  // The poll updates `sessions` every 30s; this keeps the modal showing
+  // current data without storing a stale snapshot from the row click.
+  const liveSelected = useMemo(
+    () => (selectedSessionId == null ? null : sessions.find((s) => s.session_id === selectedSessionId) || null),
+    [sessions, selectedSessionId]
+  );
+
+  // Fetch risk-history when the modal opens AND on each poll while open.
+  // The `sessions` dep means the sparkline refreshes naturally as new
+  // scores accumulate; no separate poll needed for the modal itself.
+  useEffect(() => {
+    if (selectedSessionId == null) return undefined;
+    let cancelled = false;
+    setHistoryLoading(true);
+    axios
+      .get(`/monitoring/sessions/${selectedSessionId}/risk-history`)
+      .then((res) => {
+        if (cancelled) return;
+        setRiskHistory(res.data || { count: 0, scores: [] });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load risk history:', err);
+        setRiskHistory({ count: 0, scores: [] });
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setHistoryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedSessionId, sessions]);
 
   const handleMarkReviewed = async (id) => {
     // Optimistic update
@@ -91,6 +133,37 @@ const MonitoringPanel = () => {
     if (diffHours === 1) return '1 hour ago';
     return `${diffHours} hours ago`;
   };
+
+  // Risk pill color — green/amber/red/grey (grey = not yet scored).
+  const riskPillClass = (level) => {
+    switch (level) {
+      case 'high':   return 'bg-red-100 text-red-800 border-red-300';
+      case 'medium': return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'low':    return 'bg-green-100 text-green-800 border-green-300';
+      default:       return 'bg-gray-100 text-gray-500 border-gray-300';
+    }
+  };
+
+  // Whether the latest score for a session is older than STALE_SCORE_MS.
+  // Used by the modal to render the "scoring paused" indicator.
+  const isStale = (scoredAt) => {
+    if (!scoredAt) return false;
+    return Date.now() - new Date(scoredAt).getTime() > STALE_SCORE_MS;
+  };
+
+  // Sort with risk DESC default; nulls (never-scored) sink. Sentinel -1
+  // for null risk_score keeps the comparator total-ordered.
+  const sortedSessions = useMemo(() => {
+    const copy = [...sessions];
+    if (sortBy === 'risk') {
+      copy.sort((a, b) => (b.risk_score ?? -1) - (a.risk_score ?? -1));
+    } else if (sortBy === 'started') {
+      copy.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+    } else if (sortBy === 'tab_switches') {
+      copy.sort((a, b) => (b.tab_switch_count ?? 0) - (a.tab_switch_count ?? 0));
+    }
+    return copy;
+  }, [sessions, sortBy]);
 
   // Derived metrics
   const activeSessionsCount = sessions.filter(s => s.status === 'in_progress' || s.status === 'flagged').length;
@@ -157,15 +230,37 @@ const MonitoringPanel = () => {
           {/* Left Column: Live Sessions (60%) */}
           <div className="lg:w-3/5 min-w-0">
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 bg-white">
+              <div className="px-6 py-5 border-b border-gray-200 bg-white flex items-center justify-between">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Live Sessions</h3>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-gray-500 mr-2">Sort by:</span>
+                  {[
+                    { key: 'risk',         label: 'Risk' },
+                    { key: 'started',      label: 'Started' },
+                    { key: 'tab_switches', label: 'Tab Switches' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setSortBy(opt.key)}
+                      className={`px-2 py-1 rounded ${
+                        sortBy === opt.key
+                          ? 'bg-[#7A1F2E] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              
+
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Risk</th>
                       <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Exam</th>
                       <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Started</th>
                       <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Duration</th>
@@ -175,20 +270,29 @@ const MonitoringPanel = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {!loading && sessions.length === 0 ? (
+                    {!loading && sortedSessions.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="px-6 py-8 text-center text-gray-500">No active sessions</td>
+                        <td colSpan="8" className="px-6 py-8 text-center text-gray-500">No active sessions</td>
                       </tr>
                     ) : (
-                      sessions.map((session) => {
+                      sortedSessions.map((session) => {
                         const isFlagged = session.status === 'flagged' || session.flagged;
                         const manyTabSwitches = session.tab_switch_count >= 3;
+                        const riskLabel = session.risk_score == null
+                          ? 'scoring…'
+                          : `${session.risk_score} ${session.risk_level}`;
                         return (
-                          <tr 
-                            key={session.id} 
-                            className={isFlagged ? 'border-l-4 border-red-500' : ''}
+                          <tr
+                            key={session.session_id}
+                            onClick={() => setSelectedSessionId(session.session_id)}
+                            className={`cursor-pointer hover:bg-gray-50 ${isFlagged ? 'border-l-4 border-red-500' : ''}`}
                           >
                             <td className="px-6 py-4 whitespace-nowrap">{session.student_name || session.username || `User ${session.user_id}`}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${riskPillClass(session.risk_level)}`}>
+                                {riskLabel}
+                              </span>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">{session.exam_title || `Exam ${session.exam_id}`}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               {formatDate(session.start_time)}
@@ -293,7 +397,188 @@ const MonitoringPanel = () => {
 
         </div>
       </PageMain>
+
+      {/* Control #26 — session detail modal. Renders only when a row is selected. */}
+      {selectedSessionId != null && (
+        <SessionDetailModal
+          session={liveSelected}
+          history={riskHistory}
+          historyLoading={historyLoading}
+          isStale={isStale}
+          riskPillClass={riskPillClass}
+          onClose={() => setSelectedSessionId(null)}
+        />
+      )}
     </PageWrapper>
+  );
+};
+
+// Inline SVG sparkline. No chart library — matches the lib-free convention
+// of this codebase. Renders the `last 30 risk scores` as a polyline over
+// three faintly-coloured horizontal bands (low/medium/high) so the
+// invigilator immediately sees which band the trace is sitting in.
+const Sparkline = ({ scores }) => {
+  if (!scores || scores.length === 0) {
+    return <p className="text-sm text-gray-400">No score history yet.</p>;
+  }
+  const W = 480;
+  const H = 90;
+  const PAD = 6;
+  const yForScore = (score) => PAD + (H - PAD * 2) * (1 - score / 100);
+
+  const xStep = scores.length > 1 ? (W - PAD * 2) / (scores.length - 1) : 0;
+  const points = scores
+    .map((s, i) => `${PAD + i * xStep},${yForScore(s.risk_score)}`)
+    .join(' ');
+
+  // Three risk bands as background fill (low at the bottom, high at top).
+  const yHighTop    = 0;
+  const yHighBottom = yForScore(70);
+  const yMedBottom  = yForScore(40);
+
+  return (
+    <svg width={W} height={H} className="block w-full max-w-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <rect x="0" y={yHighTop}    width={W} height={yHighBottom - yHighTop}      fill="#fee2e2" />
+      <rect x="0" y={yHighBottom} width={W} height={yMedBottom - yHighBottom}    fill="#fef3c7" />
+      <rect x="0" y={yMedBottom}  width={W} height={H - yMedBottom}              fill="#dcfce7" />
+      <polyline fill="none" stroke="#1f2937" strokeWidth="2" points={points} />
+      {scores.map((s, i) => (
+        <circle
+          key={s.score_id ?? i}
+          cx={PAD + i * xStep}
+          cy={yForScore(s.risk_score)}
+          r="2.5"
+          fill="#1f2937"
+        />
+      ))}
+    </svg>
+  );
+};
+
+const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPillClass, onClose }) => {
+  // If the session is no longer in the live list (e.g. completed during the
+  // 30s poll), `session` is null. Show a graceful "session ended" state
+  // and let the user close the modal.
+  if (!session) {
+    return (
+      <div
+        className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="text-lg font-semibold text-gray-900">Session ended</h2>
+          <p className="text-sm text-gray-600 mt-2">
+            This session is no longer active. Open the audit log for the full event timeline.
+          </p>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-800 rounded text-gray-800 hover:bg-gray-100"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const stale = isStale(session.risk_scored_at);
+  const factors = Array.isArray(session.contributing_factors) ? session.contributing_factors : [];
+  const studentLabel = session.student_name || session.username || `User ${session.user_id}`;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{studentLabel}</h2>
+            <p className="text-sm text-gray-600">{session.exam_title || `Exam ${session.exam_id}`}</p>
+            <p className="text-xs text-gray-500 mt-1 capitalize">Status: {session.status?.replace('_', ' ')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Current risk */}
+        <div className="border-t pt-4">
+          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">Current risk</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-3xl font-bold text-gray-900">
+              {session.risk_score == null ? '—' : session.risk_score}
+            </span>
+            <span className={`px-3 py-1 inline-flex text-sm font-semibold rounded-full border ${riskPillClass(session.risk_level)}`}>
+              {session.risk_level || 'not yet scored'}
+            </span>
+            {stale && (
+              <span className="px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded">
+                Scoring paused — last score &gt; 90s ago
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Contributing factors */}
+        <div className="border-t mt-4 pt-4">
+          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">Contributing factors</div>
+          {factors.length === 0 ? (
+            <p className="text-sm text-gray-400">None reported.</p>
+          ) : (
+            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+              {factors.map((f) => (
+                <li key={f}>{String(f).replace(/_/g, ' ')}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Sparkline */}
+        <div className="border-t mt-4 pt-4">
+          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+            Last {history?.count ?? 0} scores
+          </div>
+          {historyLoading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : (
+            <Sparkline scores={history?.scores || []} />
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="border-t mt-6 pt-4 flex justify-end gap-3">
+          <Link
+            to={`/manage/audit-logs?session_id=${session.session_id}`}
+            className="px-4 py-2 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+          >
+            Open in audit logs
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm border border-gray-800 rounded text-gray-800 hover:bg-gray-100"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
