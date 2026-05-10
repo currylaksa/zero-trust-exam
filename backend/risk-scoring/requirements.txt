@@ -1,0 +1,7 @@
+# Pinned after Stage 1 install; production droplet uses python3.10+/3.11.
+# If a fresh install on a different Python version fails, regenerate via:
+#   pip install flask scikit-learn numpy joblib && pip freeze > requirements.txt
+flask>=3.0,<4
+scikit-learn>=1.5,<2
+numpy>=1.26,<3
+joblib>=1.4,<2

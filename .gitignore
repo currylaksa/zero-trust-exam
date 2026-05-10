@@ -24,3 +24,9 @@ pnpm-debug.log*
 
 # Misc
 *.local
+
+# Python (risk-scoring service)
+backend/risk-scoring/venv/
+backend/risk-scoring/__pycache__/
+backend/risk-scoring/*.pkl
+backend/risk-scoring/.env
