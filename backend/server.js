@@ -50,3 +50,6 @@ app.listen(PORT, () => {
 
 const startSessionSweeper = require('./jobs/sessionSweeper');
 startSessionSweeper();
+
+const startRiskScorer = require('./jobs/riskScorer');
+startRiskScorer();
