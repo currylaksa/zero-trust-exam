@@ -22,7 +22,7 @@ const RISK_SCORING_DIR = path.join(REPO_ROOT, 'backend', 'risk-scoring');
 module.exports = {
   apps: [
     {
-      name: 'secureexam-api',
+      name: 'secureexam-backend',
       cwd: REPO_ROOT,
       script: 'backend/server.js',
       instances: 1,

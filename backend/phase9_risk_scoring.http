@@ -26,11 +26,11 @@
 # Replace these with values from your local DB after running setup.
 # A session that has accumulated risk-scored ticks via the Stage 3
 # riskScorer cron is the right candidate.
-@lecturerToken = REPLACE_WITH_LECTURER_TOKEN
-@adminToken    = REPLACE_WITH_ADMIN_TOKEN
-@studentToken  = REPLACE_WITH_STUDENT_TOKEN
-@sessionId     = REPLACE_WITH_REAL_SESSION_ID
-@otherLecturerSessionId = REPLACE_WITH_SESSION_OWNED_BY_DIFFERENT_LECTURER
+@lecturerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIyLCJzdGFnZSI6Im1mYSIsImlhdCI6MTc3ODQyNzg5NiwiZXhwIjoxNzc4NDI4MTk2fQ.9tnTiGHtZOAYzLJX5StnZ4GHQJMh70-_BJWcEKE555M
+@adminToken    = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjYsInN0YWdlIjoibWZhX3NldHVwIiwiaWF0IjoxNzc4NDI4MDAxLCJleHAiOjE3Nzg0Mjg2MDF9.J8oLRZHjzL_RgY6Xd3IeLVohDB6r7IVWzfybZ4oLWj8
+@studentToken  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9QiOjMsInN0YWdlIjoibWZhIiwiaWF0IjoxNzc4NDI3OTI2LCJleHAiOjE3Nzg0MjgyMjZ9.-LgBAUuZ6kwi15xw91eAiQgYNe7erNwZVPayknMzdEs
+@sessionId     = 64
+@otherLecturerSessionId = 65
 
 ############################################################
 # === SECTION 1: AUTHENTICATION SETUP ===
@@ -45,7 +45,7 @@ POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "lecturer@utm.my",
+  "email": "maheyzah1@utm.my",
   "password": "Password123!"
 }
 
@@ -60,7 +60,7 @@ POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@utm.my",
+  "email": "admin1@utm.my",
   "password": "Password123!"
 }
 
