@@ -77,7 +77,7 @@ const Results = () => {
     return (
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         {/* Summary Details */}
-        <div className="p-6 md:p-8 bg-gray-50 border-b border-gray-200 flex flex-col space-y-6">
+        <div className="p-6 md:p-8 bg-stone-50 border-b border-gray-200 flex flex-col space-y-6">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{session.title}</h2>
@@ -183,7 +183,7 @@ const Results = () => {
           <div className="space-y-8">
             {questions.map((q, idx) => (
               <div key={q.question_id} className="bg-white border rounded-lg shadow-sm overflow-hidden">
-                <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                <div className="bg-stone-50 px-6 py-4 border-b flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <span className="font-semibold text-gray-700">Question {idx + 1}</span>
                     <span className="text-xs uppercase font-bold tracking-wider text-gray-500 px-2 py-1 bg-gray-200 rounded">
@@ -202,7 +202,7 @@ const Results = () => {
                 </div>
                 
                 <div className="p-6">
-                  <p className="text-lg text-gray-900 whitespace-pre-wrap mb-6 font-medium bg-gray-50 p-4 rounded">
+                  <p className="text-lg text-gray-900 whitespace-pre-wrap mb-6 font-medium bg-stone-50 p-4 rounded">
                     {q.question_text}
                   </p>
 
@@ -261,7 +261,7 @@ const Results = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <div className="p-4 bg-stone-50 border border-gray-200 rounded-lg">
                             <p className="text-sm text-gray-500 mb-2 font-medium">Your Answer:</p>
                             <p className="text-gray-900 whitespace-pre-wrap">{q.student_answer || 'No answer provided'}</p>
                           </div>
@@ -283,9 +283,9 @@ const Results = () => {
                               </div>
                             </div>
                           ) : (
-                            <div className="flex items-start p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                              <svg className="w-5 h-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                              <p className="text-sm text-blue-800">
+                            <div className="flex items-start p-4 bg-[#FFF1F2] border border-[#7A1F2E]/15 rounded-lg">
+                              <svg className="w-5 h-5 text-[#7A1F2E] mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                              <p className="text-sm text-[#601826]">
                                 Pending manual review by lecturer. This question is not included in the auto-graded score.
                               </p>
                             </div>

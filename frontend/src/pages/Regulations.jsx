@@ -64,7 +64,7 @@ const Regulations = () => {
         </button>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Zero-Trust Security Regulations</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Zero-Trust Security Regulations</h1>
           <p className="mt-2 text-lg text-gray-600">
             The following policies are automatically enforced by this system. All users are bound by these regulations.
           </p>
@@ -91,7 +91,7 @@ const Regulations = () => {
           <div className="space-y-8">
             {data.categories.map((category) => (
               <div key={category.id} className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
-                <div className="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200 flex items-center">
+                <div className="px-4 py-5 sm:px-6 bg-stone-50 border-b border-gray-200 flex items-center">
                   <span className="text-2xl mr-3">{getIcon(category.icon)}</span>
                   <h3 className="text-lg leading-6 font-medium text-gray-900">
                     {category.title}
@@ -99,7 +99,7 @@ const Regulations = () => {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-stone-50">
                       <tr>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">
                           Rule
@@ -114,7 +114,7 @@ const Regulations = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {category.rules.map((rule, index) => (
-                        <tr key={rule.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <tr key={rule.id} className={index % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">
                             {rule.rule}
                           </td>

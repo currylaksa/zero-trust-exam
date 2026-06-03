@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/useAuth';
 import RoleNavbar from '../components/RoleNavbar';
-import { PageWrapper, PageMain, PageHeading, ErrorAlert } from '../components/ui';
+import { PageWrapper, PageMain, PageHeading, ErrorAlert, EmptyState } from '../components/ui';
 
 function LecturerDashboard() {
   const [exams, setExams] = useState([]);
@@ -89,9 +89,7 @@ function LecturerDashboard() {
           {loading ? (
             <div className="text-center py-10 text-gray-500">Loading exams...</div>
           ) : exams.length === 0 ? (
-            <div className="text-center py-10 bg-white shadow rounded-lg text-gray-500">
-              No exams found. Click "Create New Exam" to get started.
-            </div>
+            <EmptyState title="No exams found" subtitle='Click "Create New Exam" to get started.' />
           ) : (
             <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
               <table className="min-w-full divide-y divide-gray-200">

@@ -173,27 +173,27 @@ const ExamSummary = () => {
         
         {/* Metric Cards Top Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-[#7A1F2E]">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-[#7A1F2E]">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Enrolled</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{enrolled > 0 ? enrolled : 'N/A'}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-[#7A1F2E]">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-[#7A1F2E]">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Submissions</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{totalSubmissions}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-purple-500">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-purple-500">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Completion Rate</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{completionRate}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-yellow-500">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-yellow-500">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Average Score</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{avgPercentage}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-green-500">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-green-500">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Highest Score</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{highestScoreStr}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-red-500">
+          <div className="bg-white p-4 lift rounded-lg shadow-sm hover:shadow-md border border-gray-100 border-l-4 border-l-red-500">
             <h3 className="text-xs font-semibold text-gray-500 uppercase">Lowest Score</h3>
             <p className="mt-1 text-2xl font-bold text-gray-900">{lowestScoreStr}</p>
           </div>
@@ -227,7 +227,7 @@ const ExamSummary = () => {
 
         {/* Results Table */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-stone-50">
             <h2 className="text-lg font-bold text-gray-800">Student Results</h2>
             <button 
               onClick={handleExportCSV}
@@ -254,7 +254,7 @@ const ExamSummary = () => {
                 {submissions.map((sub) => {
                   const isFlagged = sub.status === 'flagged' || sub.tab_switch_count >= 5;
                   return (
-                    <tr key={sub.session_id} className={`hover:bg-gray-50 ${isFlagged ? 'border-l-4 border-l-red-500' : ''}`}>
+                    <tr key={sub.session_id} className={`hover:bg-stone-50 ${isFlagged ? 'border-l-4 border-l-red-500' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {sub.username}
                         <p className="text-xs text-gray-500 font-normal">{sub.email}</p>

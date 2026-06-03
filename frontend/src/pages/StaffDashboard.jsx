@@ -171,7 +171,7 @@ function StaffDashboard() {
         <div className="w-full md:w-2/5 flex flex-col">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
             
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-stone-50">
               <h2 className="text-lg font-bold text-gray-800">Courses</h2>
               <button
                 onClick={() => setShowCreateForm(!showCreateForm)}
@@ -242,9 +242,9 @@ function StaffDashboard() {
                     <li key={course.course_id}>
                       <button
                         onClick={() => setSelectedCourse(course)}
-                        className={`w-full text-left p-4 hover:bg-gray-50 transition border-l-4 ${
+                        className={`w-full text-left p-4 hover:bg-stone-50 transition border-l-4 ${
                           selectedCourse?.course_id === course.course_id 
-                            ? 'bg-blue-50 border-l-[#7A1F2E]' 
+                            ? 'bg-[#FFF1F2] border-l-[#7A1F2E]' 
                             : 'border-l-transparent'
                         }`}
                       >
@@ -275,7 +275,7 @@ function StaffDashboard() {
               </div>
             ) : (
               <>
-                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <div className="p-4 border-b border-gray-200 bg-stone-50">
                   <h2 className="text-lg font-bold text-gray-800 flex items-center">
                     Students enrolled in <span className="ml-2 text-[#7A1F2E]">{selectedCourse.course_code} - {selectedCourse.course_name}</span>
                   </h2>
@@ -304,7 +304,7 @@ function StaffDashboard() {
                           </tr>
                         ) : (
                           students.map((student) => (
-                            <tr key={student.user_id} className="hover:bg-gray-50">
+                            <tr key={student.user_id} className="hover:bg-stone-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {student.username}
                               </td>
@@ -334,7 +334,7 @@ function StaffDashboard() {
                 </div>
 
                 {/* Enroll Section */}
-                <div className="p-4 border-t border-gray-200 bg-gray-50 mt-auto">
+                <div className="p-4 border-t border-gray-200 bg-stone-50 mt-auto">
                   <h3 className="text-sm font-bold text-gray-800 mb-2">Enroll a Student</h3>
                   <div className="relative">
                     <input
@@ -361,7 +361,7 @@ function StaffDashboard() {
                               if (isEnrolled) return null;
                               
                               return (
-                                <li key={user.id} className="flex justify-between items-center p-3 hover:bg-gray-50">
+                                <li key={user.id} className="flex justify-between items-center p-3 hover:bg-stone-50">
                                   <div>
                                     <p className="text-sm font-medium text-gray-900">{user.username}</p>
                                     <p className="text-xs text-gray-500">

@@ -262,53 +262,53 @@ function ExamBuilder() {
                   </select>
                 </div>
 
-                <div className="bg-blue-50 p-4 rounded-md space-y-4">
+                <div className="bg-[#FFF1F2] p-4 rounded-md space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-blue-900">Start Time (Exam Window Opens)</label>
+                    <label className="block text-sm font-medium text-[#601826]">Start Time (Exam Window Opens)</label>
                     <input
                       type="datetime-local"
                       value={exam.start_time}
                       onChange={(e) => setExam({...exam, start_time: e.target.value})}
-                      className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
+                      className="mt-1 block w-full border border-[#7A1F2E]/30 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
                     />
-                    <p className="mt-1 text-xs text-blue-700">When students can begin taking the exam.</p>
+                    <p className="mt-1 text-xs text-[#7A1F2E]/80">When students can begin taking the exam.</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-blue-900">End Time (Exam Window Closes)</label>
+                    <label className="block text-sm font-medium text-[#601826]">End Time (Exam Window Closes)</label>
                     <input
                       type="datetime-local"
                       value={exam.end_time}
                       onChange={(e) => setExam({...exam, end_time: e.target.value})}
-                      className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
+                      className="mt-1 block w-full border border-[#7A1F2E]/30 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
                     />
-                    <p className="mt-1 text-xs text-blue-700">The absolute latest time the exam will be accepted.</p>
+                    <p className="mt-1 text-xs text-[#7A1F2E]/80">The absolute latest time the exam will be accepted.</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-blue-900">Duration (Minutes) <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-[#601826]">Duration (Minutes) <span className="text-red-500">*</span></label>
                     <input
                       type="number"
                       min="1"
                       required
                       value={exam.duration}
                       onChange={(e) => setExam({...exam, duration: e.target.value})}
-                      className="mt-1 block w-full border border-blue-300 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
+                      className="mt-1 block w-full border border-[#7A1F2E]/30 rounded-md shadow-sm p-2 focus:ring-[#7A1F2E] focus:border-[#7A1F2E] bg-white"
                     />
-                    <p className="mt-1 text-xs text-blue-700">
+                    <p className="mt-1 text-xs text-[#7A1F2E]/80">
                       Students will have this much time to complete the exam once they start, within the window above.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-blue-900">Total Marks</label>
+                    <label className="block text-sm font-medium text-[#601826]">Total Marks</label>
                     <input
                       type="text"
                       readOnly
                       value={questions.reduce((sum, q) => sum + (q.marks || 1), 0)}
                       className="mt-1 block w-full border border-gray-200 rounded-md shadow-sm p-2 bg-gray-100 text-gray-700 cursor-not-allowed font-semibold"
                     />
-                    <p className="mt-1 text-xs text-blue-700">
+                    <p className="mt-1 text-xs text-[#7A1F2E]/80">
                       Automatically calculated from the questions in your list.
                     </p>
                   </div>
@@ -351,7 +351,7 @@ function ExamBuilder() {
                     <p className="text-gray-500 text-sm italic">No questions added yet.</p>
                   ) : (
                     questions.map((q, idx) => (
-                      <div key={q.question_id} className="border border-gray-200 rounded p-4 flex justify-between items-start hover:bg-gray-50">
+                      <div key={q.question_id} className="border border-gray-200 rounded p-4 flex justify-between items-start hover:bg-stone-50">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">
                             <span className="text-gray-500 mr-2">{idx + 1}.</span>
@@ -416,7 +416,7 @@ function ExamBuilder() {
                     </div>
 
                     {qForm.question_type === 'mcq' && (
-                      <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                      <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-stone-50 space-y-3">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
                         {['A', 'B', 'C', 'D'].map((letter) => (
                           <div key={letter} className="flex items-center">

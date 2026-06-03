@@ -258,7 +258,7 @@ const ExamRoom = () => {
 
   if (questions.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-screen items-center justify-center bg-stone-50">
         <div className="text-center bg-white p-8 rounded-lg shadow-md">
           <p className="text-xl text-gray-800 mb-4">No questions found for this exam.</p>
           <button 
@@ -277,7 +277,7 @@ const ExamRoom = () => {
   const isTimeLow = timeLeft.minutes < 5;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-gray-50 font-sans text-gray-900">
+    <div className="h-screen overflow-hidden flex flex-col bg-stone-50 font-sans text-gray-900">
       {/* Top Bar */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-[#7A1F2E] border-b border-[#601826] z-50 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center space-x-4">
@@ -333,7 +333,7 @@ const ExamRoom = () => {
         </aside>
 
         {/* Main Panel - Question Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-8 flex flex-col">
+        <main className="flex-1 overflow-y-auto bg-stone-50 p-8 flex flex-col">
           <div className="mb-4">
             <span className="text-sm font-semibold text-gray-500 uppercase">
               Question {currentIndex + 1} of {questions.length}

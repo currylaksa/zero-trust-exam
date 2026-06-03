@@ -62,9 +62,16 @@ const Login = () => {
       <div className="absolute -bottom-12 -right-12 w-64 h-64 rounded-full border-[28px]
         border-white/10 pointer-events-none" />
 
+      {/* Back to public landing page */}
+      <Link to="/"
+        className="absolute top-5 left-5 z-10 inline-flex items-center gap-1.5 text-sm
+          font-medium text-white/90 hover:text-white transition">
+        <span aria-hidden="true">←</span> Back to home
+      </Link>
+
       {/* Login card */}
       <div className="relative z-10 w-full max-w-[420px] mx-4 bg-white rounded-2xl
-        shadow-2xl p-10">
+        shadow-2xl p-10 animate-in">
 
         {/* Logo + title */}
         <div className="flex flex-col items-center mb-8">

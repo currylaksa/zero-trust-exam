@@ -3,7 +3,25 @@ import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 import { useAuth } from '../context/useAuth';
 import RoleNavbar from '../components/RoleNavbar';
-import { MetricCard } from '../components/ui';
+import { MetricCard, EmptyState } from '../components/ui';
+
+// Presentational metric icons (no logic).
+const mcIcon = 'h-8 w-8';
+const IconStack = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={mcIcon}>
+    <path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" />
+  </svg>
+);
+const IconCheck = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={mcIcon}>
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+const IconPlay = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={mcIcon}>
+    <circle cx="12" cy="12" r="9" /><path d="M10 8l6 4-6 4V8z" />
+  </svg>
+);
 
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
@@ -155,13 +173,16 @@ const StudentDashboard = () => {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Exams</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Your Exams</h1>
+          <p className="mt-1 text-sm text-gray-500">Welcome back, {user?.username || 'student'}. Here are your assigned exams.</p>
+        </div>
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <MetricCard label="Total Exams" value={totalExams} accentColor="border-[#7A1F2E]" valueColor="text-[#7A1F2E]" />
-          <MetricCard label="Completed" value={completedExams} accentColor="border-green-500" valueColor="text-green-600" />
-          <MetricCard label="Available" value={availableExams} accentColor="border-amber-500" valueColor="text-amber-600" />
+          <MetricCard label="Total Exams" value={totalExams} accentColor="border-[#7A1F2E]" valueColor="text-[#7A1F2E]" icon={<IconStack />} />
+          <MetricCard label="Completed" value={completedExams} accentColor="border-green-500" valueColor="text-green-600" icon={<IconCheck />} />
+          <MetricCard label="Available" value={availableExams} accentColor="border-amber-500" valueColor="text-amber-600" icon={<IconPlay />} />
         </div>
 
         {/* Error State */}
@@ -184,17 +205,18 @@ const StudentDashboard = () => {
               </div>
             ))
           ) : dashboardExams.length === 0 ? (
-            <div className="col-span-1 md:col-span-2 text-center py-12 bg-white rounded-lg border border-gray-200 text-gray-500">
-              No exams available at this time
+            <div className="col-span-1 md:col-span-2">
+              <EmptyState title="No exams available at this time" subtitle="Published exams assigned to you will appear here." />
             </div>
           ) : (
             dashboardExams.map((exam) => (
-              <div key={exam.exam_id} className="bg-white rounded-xl border border-gray-200 p-6 shadow-md flex flex-col">
+              <div key={exam.exam_id} className="lift bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg flex flex-col">
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-900">{exam.title}</h3>
-                  <p className="text-gray-500 mt-1 mb-4">Duration: {exam.duration} minutes</p>
-                  
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${exam.statusInfo.color}`}>
+                  <p className="text-gray-500 mt-1 mb-4 text-sm">Duration: {exam.duration} minutes</p>
+
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${exam.statusInfo.color}`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
                     {exam.statusInfo.label}
                   </span>
                 </div>

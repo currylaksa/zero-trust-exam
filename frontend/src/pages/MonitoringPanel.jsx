@@ -3,10 +3,48 @@ import { Link } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/useAuth';
 import RoleNavbar from '../components/RoleNavbar';
-import { PageWrapper, PageMain, PageHeading, ErrorAlert } from '../components/ui';
+import { PageWrapper, PageMain, PageHeading, ErrorAlert, MetricCard } from '../components/ui';
 
 // Risk-band thresholds — must match backend/risk-scoring/service.py LOW_BAND/HIGH_BAND.
 const STALE_SCORE_MS = 90 * 1000;
+
+// ── Presentational helpers (no business logic) ──
+const svgCls = 'h-8 w-8';
+const IconPulse = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={svgCls}>
+    <path d="M3 12h4l2 6 4-12 2 6h6" />
+  </svg>
+);
+const IconBell = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={svgCls}>
+    <path d="M6 9a6 6 0 1112 0c0 6 2.5 6 2.5 8.5H3.5C3.5 15 6 15 6 9z" />
+    <path d="M10 20.5a2 2 0 004 0" />
+  </svg>
+);
+const IconFlag = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={svgCls}>
+    <path d="M5 21V4M5 4h12l-2.5 4L17 12H5" />
+  </svg>
+);
+
+// Pulsing "LIVE" indicator — signals the 30s auto-refresh poll is active.
+const LivePill = () => (
+  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-200">
+    <span className="lp-pulse h-1.5 w-1.5 rounded-full bg-green-500" />
+    LIVE · 30s
+  </span>
+);
+
+// Inline risk-score meter — width = score, colour = risk band.
+const RiskMeter = ({ score, level }) => {
+  if (score == null) return null;
+  const color = level === 'high' ? 'bg-red-500' : level === 'medium' ? 'bg-amber-500' : 'bg-green-500';
+  return (
+    <div className="mt-1.5 h-1 w-24 overflow-hidden rounded-full bg-gray-200">
+      <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${Math.max(4, Math.min(100, score))}%` }} />
+    </div>
+  );
+};
 
 const MonitoringPanel = () => {
   const [sessions, setSessions] = useState([]);
@@ -208,18 +246,12 @@ const MonitoringPanel = () => {
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-[#7A1F2E]">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Active Sessions</h3>
-            <p className="mt-2 text-3xl font-bold text-[#7A1F2E]">{activeSessionsCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Unreviewed Alerts</h3>
-            <p className="mt-2 text-3xl font-bold text-red-600">{unreviewedAlertsCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Flagged Today</h3>
-            <p className="mt-2 text-3xl font-bold text-yellow-600">{totalFlaggedTodayCount}</p>
-          </div>
+          <MetricCard label="Active Sessions" value={activeSessionsCount}
+            accentColor="border-[#7A1F2E]" valueColor="text-[#7A1F2E]" icon={<IconPulse />} />
+          <MetricCard label="Unreviewed Alerts" value={unreviewedAlertsCount}
+            accentColor="border-red-500" valueColor="text-red-600" icon={<IconBell />} />
+          <MetricCard label="Total Flagged Today" value={totalFlaggedTodayCount}
+            accentColor="border-yellow-500" valueColor="text-yellow-600" icon={<IconFlag />} />
         </div>
 
         <ErrorAlert message={error} className="mb-6" />
@@ -230,8 +262,11 @@ const MonitoringPanel = () => {
           {/* Left Column: Live Sessions (60%) */}
           <div className="lg:w-3/5 min-w-0">
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-200 bg-white flex items-center justify-between">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Live Sessions</h3>
+              <div className="px-6 py-5 border-b border-gray-200 bg-white flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-lg leading-6 font-semibold text-gray-900">Live Sessions</h3>
+                  <LivePill />
+                </div>
                 <div className="flex items-center gap-1 text-xs">
                   <span className="text-gray-500 mr-2">Sort by:</span>
                   {[
@@ -277,6 +312,7 @@ const MonitoringPanel = () => {
                     ) : (
                       sortedSessions.map((session) => {
                         const isFlagged = session.status === 'flagged' || session.flagged;
+                        const isHighRisk = session.risk_level === 'high';
                         const manyTabSwitches = session.tab_switch_count >= 3;
                         const riskLabel = session.risk_score == null
                           ? 'scoring…'
@@ -285,13 +321,14 @@ const MonitoringPanel = () => {
                           <tr
                             key={session.session_id}
                             onClick={() => setSelectedSessionId(session.session_id)}
-                            className={`cursor-pointer hover:bg-gray-50 ${isFlagged ? 'border-l-4 border-red-500' : ''}`}
+                            className={`cursor-pointer transition-colors ${isFlagged || isHighRisk ? 'border-l-4 border-red-500 bg-red-50/40 hover:bg-red-50' : 'hover:bg-gray-50'}`}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap">{session.student_name || session.username || `User ${session.user_id}`}</td>
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{session.student_name || session.username || `User ${session.user_id}`}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${riskPillClass(session.risk_level)}`}>
                                 {riskLabel}
                               </span>
+                              <RiskMeter score={session.risk_score} level={session.risk_level} />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">{session.exam_title || `Exam ${session.exam_id}`}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -305,7 +342,7 @@ const MonitoringPanel = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">{session.fullscreen_exit_count || 0}</td>
                             <td className="px-6 py-4 whitespace-nowrap capitalize">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${session.status === 'completed' ? 'bg-green-100 text-green-800' : session.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${session.status === 'completed' ? 'bg-green-100 text-green-800' : session.status === 'in_progress' ? 'bg-[#FFF1F2] text-[#7A1F2E] border border-[#7A1F2E]/20' : 'bg-red-100 text-red-800'}`}>
                                 {formatStatus(session.status)}
                               </span>
                             </td>
@@ -341,10 +378,10 @@ const MonitoringPanel = () => {
                             <span className="text-xs text-gray-500">{calculateTimeAgo(alertTime)}</span>
                           </div>
 
-                          <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Exam</p>
+                          <div className="mb-3 rounded-md border border-[#7A1F2E]/15 bg-[#FFF1F2] px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7A1F2E]">Exam</p>
                             <p
-                              className="text-sm font-bold leading-5 text-blue-900"
+                              className="text-sm font-bold leading-5 text-[#601826]"
                               style={{
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
@@ -381,7 +418,7 @@ const MonitoringPanel = () => {
                           <div className="flex justify-end">
                             <button
                               onClick={() => handleMarkReviewed(alert.flag_id || alert.id)}
-                              className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50 outline-none"
+                              className="px-3 py-1.5 text-sm font-semibold text-[#7A1F2E] bg-white border border-[#7A1F2E]/40 rounded-md hover:bg-[#FFF1F2] transition outline-none"
                             >
                               Mark Reviewed
                             </button>
@@ -441,14 +478,14 @@ const Sparkline = ({ scores }) => {
       <rect x="0" y={yHighTop}    width={W} height={yHighBottom - yHighTop}      fill="#fee2e2" />
       <rect x="0" y={yHighBottom} width={W} height={yMedBottom - yHighBottom}    fill="#fef3c7" />
       <rect x="0" y={yMedBottom}  width={W} height={H - yMedBottom}              fill="#dcfce7" />
-      <polyline fill="none" stroke="#1f2937" strokeWidth="2" points={points} />
+      <polyline fill="none" stroke="#7A1F2E" strokeWidth="2" points={points} />
       {scores.map((s, i) => (
         <circle
           key={s.score_id ?? i}
           cx={PAD + i * xStep}
           cy={yForScore(s.risk_score)}
           r="2.5"
-          fill="#1f2937"
+          fill="#7A1F2E"
         />
       ))}
     </svg>
@@ -565,7 +602,7 @@ const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPil
         <div className="border-t mt-6 pt-4 flex justify-end gap-3">
           <Link
             to={`/manage/audit-logs?session_id=${session.session_id}`}
-            className="px-4 py-2 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+            className="px-4 py-2 text-sm font-semibold text-[#7A1F2E] bg-white border border-[#7A1F2E]/40 rounded-md hover:bg-[#FFF1F2] transition"
           >
             Open in audit logs
           </Link>

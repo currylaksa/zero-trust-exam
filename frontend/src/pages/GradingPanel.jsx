@@ -148,7 +148,7 @@ const GradingPanel = () => {
         {/* Table */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-stone-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matric No.</th>
@@ -161,7 +161,7 @@ const GradingPanel = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {submissions.map((sub) => (
                 <React.Fragment key={sub.session_id}>
-                  <tr className="hover:bg-gray-50">
+                  <tr className="hover:bg-stone-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {sub.username}
                       <p className="text-xs text-gray-500 font-normal">{sub.email}</p>
@@ -201,7 +201,7 @@ const GradingPanel = () => {
                   {/* Expanded Row */}
                   {expandedSession === sub.session_id && (
                     <tr>
-                      <td colSpan="6" className="px-6 py-6 bg-gray-50 border-b border-gray-200">
+                      <td colSpan="6" className="px-6 py-6 bg-stone-50 border-b border-gray-200">
                         {detailsLoading ? (
                           <p className="text-center text-gray-500 text-sm">Loading answers...</p>
                         ) : sessionDetails ? (
@@ -213,7 +213,7 @@ const GradingPanel = () => {
                                 </h4>
                                 
                                 {q.question_type === 'mcq' ? (
-                                  <div className="text-sm text-gray-600 space-y-1 bg-gray-50 p-3 rounded">
+                                  <div className="text-sm text-gray-600 space-y-1 bg-stone-50 p-3 rounded">
                                     <p><span className="font-semibold">Correct Answer:</span> {q.correct_answer}</p>
                                     <p><span className="font-semibold">Student Answer:</span> <span className={q.is_correct ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>{q.student_answer || 'No Answer'}</span></p>
                                     <p><span className="font-semibold">Score:</span> {q.score !== null && q.score !== undefined ? q.score : 0} / {q.marks}</p>
@@ -229,9 +229,9 @@ const GradingPanel = () => {
                                         value={q.student_answer || 'No answer provided.'}
                                       />
                                     </div>
-                                    <div className="flex items-center space-x-4 bg-blue-50 p-3 rounded border border-blue-100">
+                                    <div className="flex items-center space-x-4 bg-[#FFF1F2] p-3 rounded border border-[#7A1F2E]/15">
                                       <div className="flex flex-col">
-                                        <label className="text-xs font-semibold text-blue-800 uppercase">Marks Available: {q.marks}</label>
+                                        <label className="text-xs font-semibold text-[#7A1F2E] uppercase">Marks Available: {q.marks}</label>
                                         <div className="flex items-center mt-1">
                                           <input
                                             type="number"
@@ -239,7 +239,7 @@ const GradingPanel = () => {
                                             max={q.marks}
                                             value={scores[q.answer_id] !== undefined ? scores[q.answer_id] : ''}
                                             onChange={(e) => handleScoreChange(q.answer_id, e.target.value)}
-                                            className="w-20 p-2 border border-blue-300 rounded shadow-sm text-sm focus:ring-[#7A1F2E] focus:border-[#7A1F2E]"
+                                            className="w-20 p-2 border border-[#7A1F2E]/30 rounded shadow-sm text-sm focus:ring-[#7A1F2E] focus:border-[#7A1F2E]"
                                             placeholder="Score"
                                             disabled={q.is_nullified || !q.answer_id}
                                           />

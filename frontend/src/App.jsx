@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Public Pages
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import MFAVerify from './pages/MFAVerify';
 import Unauthorized from './pages/Unauthorized';
@@ -53,6 +54,8 @@ function App() {
       <AuthProvider>
         <Routes>
           {/* ===== PUBLIC ROUTES ===== */}
+          {/* Public marketing landing page — default entry point, no auth required */}
+          <Route path="/" element={<LandingPage />} />
           {/* /setup-mfa is public because it authenticates via exam_setup_token */}
           {/* (in localStorage), not via a full JWT — the user has not yet */}
           {/* completed MFA enrollment and therefore holds no real session. */}
@@ -96,10 +99,6 @@ function App() {
           <Route element={<ProtectedRoute roles={['staff']} />}>
             <Route path="/staff/dashboard" element={<StaffDashboard />} />
           </Route>
-
-          {/* ===== DEFAULT ROUTE ===== */}
-          {/* Redirect / to /dashboard by default */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* ===== CATCH-ALL ===== */}
           {/* Undefined routes go to unauthorized */}

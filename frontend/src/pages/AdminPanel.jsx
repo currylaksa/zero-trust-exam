@@ -153,7 +153,7 @@ const AdminPanel = () => {
 
             <div className="bg-white shadow border rounded-lg overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-stone-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
@@ -204,7 +204,7 @@ const AdminPanel = () => {
             <h3 className="text-xl font-semibold mb-4">Recent Activity</h3>
             <div className="bg-white shadow border rounded-lg overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-stone-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
