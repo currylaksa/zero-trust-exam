@@ -34,12 +34,30 @@
  *   # Seed (idempotent — clears any previous demo data first, then re-seeds):
  *   node demo_seed.js seed
  *
- *   # Remove all demo data and nothing else:
+ *   # Remove all demo data and nothing else (also removes the student demo):
  *   node demo_seed.js teardown
  *
- *   # Both commands print the target DB and ask for confirmation. To skip the
+ *   # Seed/teardown print the target DB and ask for confirmation. To skip the
  *   # prompt (e.g. in a script), pass --yes:
  *   node demo_seed.js seed --yes
+ *
+ * ----------------------------------------------------------------------------
+ * STUDENT-SIDE LIVE DEMO (tab-switch / fullscreen-exit warnings)
+ * ----------------------------------------------------------------------------
+ * The warnings are LIVE browser events inside the ExamRoom — no DB seed makes
+ * them appear. These commands just provision a loggable student + a ready exam
+ * so you can get INTO a session quickly and trigger the warnings by hand.
+ *
+ *   # Provision a loggable demo student + published exam + questions:
+ *   node demo_seed.js student-demo
+ *
+ *   # Print the current 6-digit MFA code for that student (valid ~30s) — no
+ *   # phone/authenticator app needed:
+ *   node demo_seed.js student-code
+ *
+ *   Then, in the browser: log in as the printed student → enter the MFA code →
+ *   start "Sample Quiz (DEMO – Live)" → Cmd/Alt-Tab back (tab-switch toast) →
+ *   press Esc (fullscreen-exit toast). teardown removes this student too.
  *
  * Reads DB credentials from backend/.env via ../config/db. The Python scorer
  * URL is overridable with RISK_SCORER_URL (defaults to http://127.0.0.1:8001).
@@ -54,6 +72,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const readline = require('readline');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
+const speakeasy = require('speakeasy');
 const db = require('../config/db');
 
 // ---------------------------------------------------------------------------
@@ -62,6 +82,26 @@ const db = require('../config/db');
 const EMAIL_DOMAIN = 'demoseed.local';        // every demo user's email host
 const MARKER = 'DEMOSEED';                     // tag in exam/log/flag text
 const EXAM_TITLE = 'Sample Midterm (DEMO)';
+
+// ── Student-side live demo (tab-switch / fullscreen warnings) ──
+// A real, loggable student + a ready-to-start published exam. Shares the
+// @demoseed.local domain + DEMOSEED marker so the existing teardown removes it.
+const STUDENT_EMAIL    = `demo-exam-student@${EMAIL_DOMAIN}`;
+const STUDENT_USERNAME = 'Demo Exam Student';
+const STUDENT_PASSWORD = 'DemoPass123!';
+// Fixed base32 TOTP secret (matches authController's encoding:'base32'), so
+// `student-code` can print a valid code without touching an authenticator app.
+const STUDENT_MFA_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+const STUDENT_EXAM_TITLE = 'Sample Quiz (DEMO – Live)';
+// Student dashboard (getAllExams) only lists published exams for courses the
+// student is enrolled in — so the demo needs its own course + enrollment.
+const COURSE_CODE = 'DEMOSEED-LIVE';
+const COURSE_NAME = 'DEMOSEED Live Demo Course';
+const STUDENT_QUESTIONS = [
+  { q: 'Zero-Trust security assumes which of the following?', opts: ['Trust the internal network', 'Never trust, always verify', 'Trust verified devices forever', 'Trust users after first login'], correct: 'Never trust, always verify' },
+  { q: 'During a proctored exam, switching browser tabs is…', opts: ['Encouraged', 'Logged as a monitored activity', 'Always blocked', 'Ignored'], correct: 'Logged as a monitored activity' },
+  { q: 'What does MFA add to authentication?', opts: ['A second verification factor', 'A faster login', 'A longer password', 'Nothing'], correct: 'A second verification factor' },
+];
 
 const SCORER_URL = process.env.RISK_SCORER_URL || 'http://127.0.0.1:8001';
 const SCORER = axios.create({ baseURL: SCORER_URL, timeout: 2000 });
@@ -225,6 +265,12 @@ async function resolveDemoIds() {
   );
   const examIds = exams.map((e) => e.exam_id);
 
+  const [courses] = await db.execute(
+    `SELECT course_id FROM Course WHERE course_code = ? OR course_name LIKE ?`,
+    [COURSE_CODE, `%${MARKER}%`]
+  );
+  const courseIds = courses.map((c) => c.course_id);
+
   let sessionIds = [];
   if (userIds.length || examIds.length) {
     const clauses = [];
@@ -238,11 +284,11 @@ async function resolveDemoIds() {
     sessionIds = sessions.map((s) => s.session_id);
   }
 
-  return { userIds, examIds, sessionIds };
+  return { userIds, examIds, sessionIds, courseIds };
 }
 
 async function teardown() {
-  const { userIds, examIds, sessionIds } = await resolveDemoIds();
+  const { userIds, examIds, sessionIds, courseIds } = await resolveDemoIds();
 
   if (sessionIds.length) {
     const inSess = sessionIds.map(() => '?').join(',');
@@ -257,12 +303,28 @@ async function teardown() {
   // Sweep any ActivityLog orphaned by a previous run (session_id went NULL).
   await db.execute(`DELETE FROM ActivityLog WHERE session_id IS NULL AND description LIKE ?`, [`${MARKER}%`]);
 
+  // FK-safe order for the RESTRICT chain: CourseEnrollment → Exam → Course → User.
+  if (userIds.length || courseIds.length) {
+    const clauses = [];
+    const params = [];
+    if (courseIds.length) { clauses.push(`course_id IN (${courseIds.map(() => '?').join(',')})`); params.push(...courseIds); }
+    if (userIds.length) { clauses.push(`user_id IN (${userIds.map(() => '?').join(',')})`); params.push(...userIds); }
+    await db.execute(`DELETE FROM CourseEnrollment WHERE ${clauses.join(' OR ')}`, params);
+  }
+
   if (examIds.length) {
     const inExam = examIds.map(() => '?').join(',');
     await db.execute(`DELETE FROM Exam WHERE exam_id IN (${inExam})`, examIds);
   }
+  if (courseIds.length) {
+    const inCourse = courseIds.map(() => '?').join(',');
+    await db.execute(`DELETE FROM Course WHERE course_id IN (${inCourse})`, courseIds);
+  }
   if (userIds.length) {
     const inUser = userIds.map(() => '?').join(',');
+    // Non-session logs (e.g. LOGIN) are SET NULL on user delete, not removed —
+    // so delete them by user first (the live student demo produces these).
+    await db.execute(`DELETE FROM ActivityLog WHERE user_id IN (${inUser})`, userIds);
     // Student rows (if any) cascade on user delete.
     await db.execute(`DELETE FROM User WHERE user_id IN (${inUser})`, userIds);
   }
@@ -383,6 +445,119 @@ async function seed() {
 }
 
 // ---------------------------------------------------------------------------
+// Student-side live demo — provision a loggable student + ready exam.
+// Scoped cleanup (only the student-demo rows) so it does NOT wipe the
+// dashboard `seed` data. Full `teardown` still removes everything.
+// ---------------------------------------------------------------------------
+async function removeStudentDemo() {
+  const [users] = await db.execute(`SELECT user_id FROM User WHERE email = ?`, [STUDENT_EMAIL]);
+  const userIds = users.map((u) => u.user_id);
+  const [exams] = await db.execute(`SELECT exam_id FROM Exam WHERE title = ?`, [STUDENT_EXAM_TITLE]);
+  const examIds = exams.map((e) => e.exam_id);
+  const [courses] = await db.execute(`SELECT course_id FROM Course WHERE course_code = ?`, [COURSE_CODE]);
+  const courseIds = courses.map((c) => c.course_id);
+
+  let sessionIds = [];
+  if (userIds.length || examIds.length) {
+    const clauses = [];
+    const params = [];
+    if (userIds.length) { clauses.push(`user_id IN (${userIds.map(() => '?').join(',')})`); params.push(...userIds); }
+    if (examIds.length) { clauses.push(`exam_id IN (${examIds.map(() => '?').join(',')})`); params.push(...examIds); }
+    const [sessions] = await db.execute(`SELECT session_id FROM ExamSession WHERE ${clauses.join(' OR ')}`, params);
+    sessionIds = sessions.map((s) => s.session_id);
+  }
+  if (sessionIds.length) {
+    const inSess = sessionIds.map(() => '?').join(',');
+    await db.execute(`DELETE FROM FlaggedActivity  WHERE session_id IN (${inSess})`, sessionIds);
+    await db.execute(`DELETE FROM SessionRiskScore WHERE session_id IN (${inSess})`, sessionIds);
+    await db.execute(`DELETE FROM ActivityLog      WHERE session_id IN (${inSess})`, sessionIds);
+    await db.execute(`DELETE FROM ExamSession      WHERE session_id IN (${inSess})`, sessionIds);
+  }
+  if (userIds.length) {
+    const inUser = userIds.map(() => '?').join(',');
+    await db.execute(`DELETE FROM ActivityLog WHERE user_id IN (${inUser})`, userIds);  // LOGIN logs etc.
+  }
+  // FK-safe order: CourseEnrollment → Exam → Course → User (all RESTRICT).
+  if (userIds.length || courseIds.length) {
+    const clauses = [];
+    const params = [];
+    if (courseIds.length) { clauses.push(`course_id IN (${courseIds.map(() => '?').join(',')})`); params.push(...courseIds); }
+    if (userIds.length) { clauses.push(`user_id IN (${userIds.map(() => '?').join(',')})`); params.push(...userIds); }
+    await db.execute(`DELETE FROM CourseEnrollment WHERE ${clauses.join(' OR ')}`, params);
+  }
+  if (examIds.length) await db.execute(`DELETE FROM Exam WHERE exam_id IN (${examIds.map(() => '?').join(',')})`, examIds);
+  if (courseIds.length) await db.execute(`DELETE FROM Course WHERE course_id IN (${courseIds.map(() => '?').join(',')})`, courseIds);
+  if (userIds.length) await db.execute(`DELETE FROM User WHERE user_id IN (${userIds.map(() => '?').join(',')})`, userIds);
+  return { users: userIds.length, exams: examIds.length, sessions: sessionIds.length };
+}
+
+function liveMfaCode() {
+  const code = speakeasy.totp({ secret: STUDENT_MFA_SECRET, encoding: 'base32' });
+  const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+  return { code, remaining };
+}
+
+async function seedStudentDemo() {
+  const removed = await removeStudentDemo();
+  console.log(`[student-demo] cleared previous student demo (${removed.users} user, ${removed.exams} exam, ${removed.sessions} sessions)`);
+
+  const hash = await bcrypt.hash(STUDENT_PASSWORD, 10);
+  const [stu] = await db.execute(
+    `INSERT INTO User (username, password, email, role, mfa_enabled, mfa_secret)
+     VALUES (?, ?, ?, 'student', TRUE, ?)`,
+    [STUDENT_USERNAME, hash, STUDENT_EMAIL, STUDENT_MFA_SECRET]
+  );
+  const studentId = stu.insertId;
+
+  // Self-contained course + enrollment so the exam shows on the student
+  // dashboard and passes startSession's enrollment check.
+  const [course] = await db.execute(
+    `INSERT INTO Course (course_code, course_name, created_by) VALUES (?, ?, ?)`,
+    [COURSE_CODE, COURSE_NAME, studentId]
+  );
+  const courseId = course.insertId;
+  await db.execute(
+    `INSERT INTO CourseEnrollment (course_id, user_id, enrolled_by) VALUES (?, ?, ?)`,
+    [courseId, studentId, studentId]
+  );
+
+  // Bound to the demo course; NULL start/end → open window.
+  const [exam] = await db.execute(
+    `INSERT INTO Exam (title, description, duration, created_by, status, course_id)
+     VALUES (?, ?, ?, ?, 'published', ?)`,
+    [STUDENT_EXAM_TITLE, `${MARKER} live student demo — safe to delete`, 30, studentId, courseId]
+  );
+  const examId = exam.insertId;
+
+  for (let i = 0; i < STUDENT_QUESTIONS.length; i++) {
+    const item = STUDENT_QUESTIONS[i];
+    await db.execute(
+      `INSERT INTO Question (exam_id, question_text, question_type, options, correct_answer, question_order)
+       VALUES (?, ?, 'mcq', ?, ?, ?)`,
+      [examId, item.q, JSON.stringify(item.opts), item.correct, i + 1]
+    );
+  }
+
+  const { code, remaining } = liveMfaCode();
+  console.log(`\n[student-demo] ready — exam "${STUDENT_EXAM_TITLE}" (#${examId}), ${STUDENT_QUESTIONS.length} questions.\n`);
+  console.log('  Login:');
+  console.log(`    email    : ${STUDENT_EMAIL}`);
+  console.log(`    password : ${STUDENT_PASSWORD}`);
+  console.log(`    MFA code : ${code}   (valid ~${remaining}s — or run: node demo_seed.js student-code)\n`);
+  console.log('  Demo steps:');
+  console.log('    1. Log in as the student above; enter the MFA code at /verify-mfa.');
+  console.log(`    2. Start "${STUDENT_EXAM_TITLE}" from the student dashboard.`);
+  console.log('    3. Cmd/Alt-Tab to another window and back → amber "Tab switch detected" toast.');
+  console.log('    4. Press Esc to exit fullscreen            → red "Fullscreen exited" toast.');
+  console.log('\n  Clean up later with: node demo_seed.js teardown');
+}
+
+function printStudentCode() {
+  const { code, remaining } = liveMfaCode();
+  console.log(`MFA code for ${STUDENT_EMAIL}: ${code}   (valid ~${remaining}s)`);
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 function confirm(question) {
@@ -393,10 +568,18 @@ function confirm(question) {
 async function main() {
   const cmd = process.argv[2];
   const skip = process.argv.includes('--yes');
+  const VALID = ['seed', 'teardown', 'student-demo', 'student-code'];
 
-  if (cmd !== 'seed' && cmd !== 'teardown') {
-    console.error('Usage: node demo_seed.js <seed|teardown> [--yes]');
+  if (!VALID.includes(cmd)) {
+    console.error('Usage: node demo_seed.js <seed|teardown|student-demo|student-code> [--yes]');
     process.exit(1);
+  }
+
+  // Read-only: just print the live TOTP. No DB, no confirmation.
+  if (cmd === 'student-code') {
+    printStudentCode();
+    await db.end();
+    return;
   }
 
   const host = process.env.DB_HOST || '(unknown)';
@@ -415,6 +598,8 @@ async function main() {
 
   if (cmd === 'seed') {
     await seed();
+  } else if (cmd === 'student-demo') {
+    await seedStudentDemo();
   } else {
     const removed = await teardown();
     console.log(`[teardown] removed ${removed.sessions} demo sessions, ${removed.exams} exam(s), ${removed.users} user(s).`);
