@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/useAuth';
 import RoleNavbar from '../components/RoleNavbar';
-import { PageWrapper, PageMain, PageHeading, ErrorAlert, MetricCard } from '../components/ui';
+import { PageWrapper, PageMain, PageHeading, ErrorAlert, MetricCard, Badge } from '../components/ui';
 
 // Risk-band thresholds — must match backend/risk-scoring/service.py LOW_BAND/HIGH_BAND.
 const STALE_SCORE_MS = 90 * 1000;
@@ -35,16 +35,18 @@ const LivePill = () => (
   </span>
 );
 
-// Inline risk-score meter — width = score, colour = risk band.
-const RiskMeter = ({ score, level }) => {
-  if (score == null) return null;
-  const color = level === 'high' ? 'bg-red-500' : level === 'medium' ? 'bg-amber-500' : 'bg-green-500';
-  return (
-    <div className="mt-1.5 h-1 w-24 overflow-hidden rounded-full bg-gray-200">
-      <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${Math.max(4, Math.min(100, score))}%` }} />
-    </div>
-  );
-};
+// Risk band → meter colour. Single source for the card accents.
+const riskBandColor = (level) =>
+  level === 'high' ? 'bg-red-500' : level === 'medium' ? 'bg-amber-500' : 'bg-green-500';
+
+// One labelled telemetry field inside a session card. Mono value gives the
+// "instrument readout" feel (IBM Plex Mono via --font-mono).
+const Field = ({ label, value, valueClass = '' }) => (
+  <div className="min-w-0">
+    <dt className="text-[10px] font-medium uppercase tracking-wider text-gray-400">{label}</dt>
+    <dd className={`mt-0.5 truncate font-mono text-sm text-gray-800 ${valueClass}`}>{value}</dd>
+  </div>
+);
 
 const MonitoringPanel = () => {
   const [sessions, setSessions] = useState([]);
@@ -290,68 +292,73 @@ const MonitoringPanel = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Risk</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Exam</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Started</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Tab Switches (total away time)</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Fullscreen Exits</th>
-                      <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {!loading && sortedSessions.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" className="px-6 py-8 text-center text-gray-500">No active sessions</td>
-                      </tr>
-                    ) : (
-                      sortedSessions.map((session) => {
-                        const isFlagged = session.status === 'flagged' || session.flagged;
-                        const isHighRisk = session.risk_level === 'high';
-                        const manyTabSwitches = session.tab_switch_count >= 3;
-                        const riskLabel = session.risk_score == null
-                          ? 'scoring…'
-                          : `${session.risk_score} ${session.risk_level}`;
-                        return (
-                          <tr
-                            key={session.session_id}
-                            onClick={() => setSelectedSessionId(session.session_id)}
-                            className={`cursor-pointer transition-colors ${isFlagged || isHighRisk ? 'border-l-4 border-red-500 bg-red-50/40 hover:bg-red-50' : 'hover:bg-gray-50'}`}
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{session.student_name || session.username || `User ${session.user_id}`}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${riskPillClass(session.risk_level)}`}>
-                                {riskLabel}
-                              </span>
-                              <RiskMeter score={session.risk_score} level={session.risk_level} />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">{session.exam_title || `Exam ${session.exam_id}`}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {formatDate(session.start_time)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">{calculateDuration(session.start_time, session.end_time)}</td>
-                            <td className={`px-6 py-4 whitespace-nowrap ${manyTabSwitches ? 'text-red-600 font-bold' : ''}`}>
-                              {session.total_away_seconds !== null && session.total_away_seconds !== undefined
-                                ? `${session.tab_switch_count || 0} switches (${session.total_away_seconds}s total)`
-                                : (session.tab_switch_count || 0)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">{session.fullscreen_exit_count || 0}</td>
-                            <td className="px-6 py-4 whitespace-nowrap capitalize">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${session.status === 'completed' ? 'bg-green-100 text-green-800' : session.status === 'in_progress' ? 'bg-[#FFF1F2] text-[#7A1F2E] border border-[#7A1F2E]/20' : 'bg-red-100 text-red-800'}`}>
-                                {formatStatus(session.status)}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+              <div className="max-h-[640px] space-y-3 overflow-y-auto bg-stone-50/50 p-3 sm:p-4">
+                {!loading && sortedSessions.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-gray-500">No active sessions</div>
+                ) : (
+                  sortedSessions.map((session) => {
+                    const isFlagged = session.status === 'flagged' || session.flagged;
+                    const isHighRisk = session.risk_level === 'high';
+                    const isAlert = isFlagged || isHighRisk;
+                    const manyTabSwitches = session.tab_switch_count >= 3;
+                    const riskLabel = session.risk_score == null
+                      ? 'scoring…'
+                      : `${session.risk_score} ${session.risk_level}`;
+                    const studentLabel = session.student_name || session.username || `User ${session.user_id}`;
+                    const tabsValue = session.total_away_seconds !== null && session.total_away_seconds !== undefined
+                      ? `${session.tab_switch_count || 0} · ${session.total_away_seconds}s away`
+                      : `${session.tab_switch_count || 0}`;
+                    const statusChip = session.status === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : session.status === 'in_progress'
+                        ? 'bg-[#FFF1F2] text-[#7A1F2E] border border-[#7A1F2E]/20'
+                        : 'bg-red-100 text-red-800';
+                    return (
+                      <button
+                        key={session.session_id}
+                        type="button"
+                        onClick={() => setSelectedSessionId(session.session_id)}
+                        className={`lift block w-full rounded-xl border p-4 text-left transition ${
+                          isAlert
+                            ? 'border-red-200 border-l-4 border-l-red-500 bg-red-50/50 hover:bg-red-50'
+                            : 'border-gray-200 bg-white hover:border-[#7A1F2E]/30 hover:shadow-md'
+                        }`}
+                      >
+                        {/* Header: student + exam, risk pill */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-900">{studentLabel}</p>
+                            <p className="truncate text-xs text-gray-500">{session.exam_title || `Exam ${session.exam_id}`}</p>
+                          </div>
+                          <span className={`inline-flex shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${riskPillClass(session.risk_level)}`}>
+                            {riskLabel}
+                          </span>
+                        </div>
+
+                        {/* Risk meter + live status */}
+                        <div className="mt-3 flex items-center gap-3">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className={`h-full rounded-full ${riskBandColor(session.risk_level)} transition-all duration-700`}
+                              style={{ width: `${Math.max(4, Math.min(100, session.risk_score ?? 0))}%` }}
+                            />
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${statusChip}`}>
+                            {formatStatus(session.status)}
+                          </span>
+                        </div>
+
+                        {/* Telemetry — wraps 2×2 on narrow, 1×4 on wide. Never scrolls sideways. */}
+                        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+                          <Field label="Started" value={formatDate(session.start_time)} />
+                          <Field label="Duration" value={calculateDuration(session.start_time, session.end_time)} />
+                          <Field label="Tab switches" value={tabsValue} valueClass={manyTabSwitches ? 'text-red-600 font-semibold' : ''} />
+                          <Field label="Fullscreen" value={session.fullscreen_exit_count || 0} />
+                        </dl>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -443,6 +450,8 @@ const MonitoringPanel = () => {
           historyLoading={historyLoading}
           isStale={isStale}
           riskPillClass={riskPillClass}
+          formatDate={formatDate}
+          calculateDuration={calculateDuration}
           onClose={() => setSelectedSessionId(null)}
         />
       )}
@@ -451,48 +460,94 @@ const MonitoringPanel = () => {
 };
 
 // Inline SVG sparkline. No chart library — matches the lib-free convention
-// of this codebase. Renders the `last 30 risk scores` as a polyline over
-// three faintly-coloured horizontal bands (low/medium/high) so the
-// invigilator immediately sees which band the trace is sitting in.
+// of this codebase. Renders the recent risk scores as a trace over three
+// risk bands (low/medium/high) with dashed 40/70 threshold guides, a soft
+// area fill, and the latest point emphasised with its value — so the
+// invigilator reads both the band and the trend at a glance.
 const Sparkline = ({ scores }) => {
   if (!scores || scores.length === 0) {
     return <p className="text-sm text-gray-400">No score history yet.</p>;
   }
   const W = 480;
-  const H = 90;
-  const PAD = 6;
-  const yForScore = (score) => PAD + (H - PAD * 2) * (1 - score / 100);
+  const H = 120;
+  const PAD_L = 26;          // room for y-axis labels
+  const PAD_R = 10;
+  const PAD_Y = 10;
+  const x0 = PAD_L;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_Y * 2;
+  const yForScore = (s) => PAD_Y + plotH * (1 - Math.max(0, Math.min(100, s)) / 100);
+  const xStep = scores.length > 1 ? plotW / (scores.length - 1) : 0;
+  const xForI = (i) => x0 + i * xStep;
 
-  const xStep = scores.length > 1 ? (W - PAD * 2) / (scores.length - 1) : 0;
-  const points = scores
-    .map((s, i) => `${PAD + i * xStep},${yForScore(s.risk_score)}`)
-    .join(' ');
+  const linePts = scores.map((s, i) => `${xForI(i)},${yForScore(s.risk_score)}`).join(' ');
+  const areaPts = `${x0},${yForScore(0)} ${linePts} ${xForI(scores.length - 1)},${yForScore(0)}`;
 
-  // Three risk bands as background fill (low at the bottom, high at top).
-  const yHighTop    = 0;
-  const yHighBottom = yForScore(70);
-  const yMedBottom  = yForScore(40);
+  const yHigh = yForScore(70);
+  const yMed  = yForScore(40);
+  const last  = scores[scores.length - 1];
+  const lastX = xForI(scores.length - 1);
+  const lastY = yForScore(last.risk_score);
+  const labelY = Math.max(12, lastY - 9);
+  const bandStroke = last.risk_level === 'high' ? '#dc2626' : last.risk_level === 'medium' ? '#d97706' : '#16a34a';
+  const mono = 'var(--font-mono, monospace)';
+  const fmtTime = (t) => (t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
 
   return (
-    <svg width={W} height={H} className="block w-full max-w-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <rect x="0" y={yHighTop}    width={W} height={yHighBottom - yHighTop}      fill="#fee2e2" />
-      <rect x="0" y={yHighBottom} width={W} height={yMedBottom - yHighBottom}    fill="#fef3c7" />
-      <rect x="0" y={yMedBottom}  width={W} height={H - yMedBottom}              fill="#dcfce7" />
-      <polyline fill="none" stroke="#7A1F2E" strokeWidth="2" points={points} />
-      {scores.map((s, i) => (
-        <circle
-          key={s.score_id ?? i}
-          cx={PAD + i * xStep}
-          cy={yForScore(s.risk_score)}
-          r="2.5"
-          fill="#7A1F2E"
-        />
-      ))}
-    </svg>
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Risk score trend over time">
+        <defs>
+          <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7A1F2E" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#7A1F2E" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Risk bands */}
+        <rect x={x0} y={PAD_Y} width={plotW} height={yHigh - PAD_Y}      fill="#fee2e2" />
+        <rect x={x0} y={yHigh} width={plotW} height={yMed - yHigh}        fill="#fef3c7" />
+        <rect x={x0} y={yMed}  width={plotW} height={(H - PAD_Y) - yMed}  fill="#dcfce7" />
+
+        {/* Y labels + dashed guides at the 40/70 thresholds */}
+        {[100, 70, 40, 0].map((v) => (
+          <g key={v}>
+            {(v === 70 || v === 40) && (
+              <line x1={x0} y1={yForScore(v)} x2={W - PAD_R} y2={yForScore(v)} stroke="#9ca3af" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+            )}
+            <text x={x0 - 6} y={yForScore(v)} textAnchor="end" dominantBaseline="middle" fontSize="9" fill="#9ca3af" fontFamily={mono}>{v}</text>
+          </g>
+        ))}
+
+        {/* Area + trace */}
+        <polygon points={areaPts} fill="url(#sparkFill)" />
+        <polyline className="spark-line" pathLength="1" fill="none" stroke="#7A1F2E" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" points={linePts} />
+
+        {/* Points with white halo */}
+        {scores.map((s, i) => (
+          <circle key={s.score_id ?? i} cx={xForI(i)} cy={yForScore(s.risk_score)} r="2.5" fill="#7A1F2E" stroke="#fff" strokeWidth="1" />
+        ))}
+
+        {/* Latest point emphasised + value */}
+        <circle cx={lastX} cy={lastY} r="6" fill="none" stroke={bandStroke} strokeWidth="2" opacity="0.45" />
+        <circle cx={lastX} cy={lastY} r="3.5" fill={bandStroke} stroke="#fff" strokeWidth="1.5" />
+        <text x={lastX - 7} y={labelY} textAnchor="end" fontSize="11" fontWeight="700" fill={bandStroke} fontFamily={mono}>{last.risk_score}</text>
+      </svg>
+
+      {/* Time range + band legend */}
+      <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400">
+        <span className="font-mono">{fmtTime(scores[0].scored_at)}</span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-400" />low</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />med</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-400" />high</span>
+        </div>
+        <span className="font-mono">{fmtTime(last.scored_at)}</span>
+      </div>
+    </div>
   );
 };
 
-const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPillClass, onClose }) => {
+const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPillClass, formatDate, calculateDuration, onClose }) => {
   // If the session is no longer in the live list (e.g. completed during the
   // 30s poll), `session` is null. Show a graceful "session ended" state
   // and let the user close the modal.
@@ -527,6 +582,14 @@ const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPil
   const stale = isStale(session.risk_scored_at);
   const factors = Array.isArray(session.contributing_factors) ? session.contributing_factors : [];
   const studentLabel = session.student_name || session.username || `User ${session.user_id}`;
+  const tabsValue = session.total_away_seconds !== null && session.total_away_seconds !== undefined
+    ? `${session.tab_switch_count || 0} · ${session.total_away_seconds}s away`
+    : `${session.tab_switch_count || 0}`;
+  const factorColor = session.risk_level === 'high' ? 'red' : session.risk_level === 'medium' ? 'amber' : 'gray';
+  const histScores = history?.scores || [];
+  const trendDelta = histScores.length >= 2
+    ? histScores[histScores.length - 1].risk_score - histScores[0].risk_score
+    : null;
 
   return (
     <div
@@ -572,24 +635,45 @@ const SessionDetailModal = ({ session, history, historyLoading, isStale, riskPil
           </div>
         </div>
 
+        {/* Behavioural signals — the numbers behind the score (already on the session row) */}
+        <div className="border-t mt-4 pt-4">
+          <div className="text-xs uppercase tracking-wider text-gray-500 mb-3">Behavioural signals</div>
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+            <Field label="Tab switches" value={tabsValue} />
+            <Field label="Fullscreen" value={session.fullscreen_exit_count || 0} />
+            <Field label="Duration" value={calculateDuration(session.start_time, session.end_time)} />
+            <Field label="Started" value={formatDate(session.start_time)} />
+          </dl>
+        </div>
+
         {/* Contributing factors */}
         <div className="border-t mt-4 pt-4">
           <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">Contributing factors</div>
           {factors.length === 0 ? (
             <p className="text-sm text-gray-400">None reported.</p>
           ) : (
-            <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+            <div className="flex flex-wrap gap-2">
               {factors.map((f) => (
-                <li key={f}>{String(f).replace(/_/g, ' ')}</li>
+                <Badge key={f} color={factorColor} className="capitalize">
+                  <span aria-hidden="true">⚠</span>
+                  {String(f).replace(/_/g, ' ')}
+                </Badge>
               ))}
-            </ul>
+            </div>
           )}
         </div>
 
         {/* Sparkline */}
         <div className="border-t mt-4 pt-4">
-          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
-            Last {history?.count ?? 0} scores
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wider text-gray-500">
+              Last {history?.count ?? 0} scores
+            </div>
+            {trendDelta != null && trendDelta !== 0 && (
+              <span className={`inline-flex items-center gap-1 font-mono text-xs font-semibold ${trendDelta > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {trendDelta > 0 ? '▲' : '▼'} {trendDelta > 0 ? '+' : ''}{trendDelta}
+              </span>
+            )}
           </div>
           {historyLoading ? (
             <p className="text-sm text-gray-400">Loading…</p>

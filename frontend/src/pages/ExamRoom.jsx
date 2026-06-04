@@ -276,6 +276,20 @@ const ExamRoom = () => {
   const answeredCount = Object.keys(answers).filter(k => answers[k] !== undefined && answers[k] !== '').length;
   const isTimeLow = timeLeft.minutes < 5;
 
+  // ── Zero-trust warning presentation ──
+  // Purely derived from the existing `warning` string set by the detection
+  // effects above. No new state, no logic — just how the warning is displayed.
+  const isFullscreenWarn = warning.includes('Fullscreen');
+  const awayMatch = warning.match(/(\d+)\s*seconds/);
+  const warnTitle = isFullscreenWarn ? 'Fullscreen exited' : 'Tab switch detected';
+  const warnSubtitle = isFullscreenWarn
+    ? 'Restoring proctored mode…'
+    : (awayMatch ? `You were away for ${awayMatch[1]} seconds.` : 'You left the exam tab.');
+  const warnDurationMs = isFullscreenWarn ? 3000 : 5000;   // mirrors the effect timers
+  const warnTheme = isFullscreenWarn
+    ? { border: 'border-red-500', icon: 'text-red-600', title: 'text-red-800', bar: 'bg-red-500' }
+    : { border: 'border-amber-500', icon: 'text-amber-600', title: 'text-amber-900', bar: 'bg-amber-500' };
+
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-stone-50 font-sans text-gray-900">
       {/* Top Bar */}
@@ -284,10 +298,7 @@ const ExamRoom = () => {
           <h1 className="text-xl font-bold text-white truncate max-w-xs">{sessionData?.title || 'Exam Session'}</h1>
         </div>
 
-        {/* Warning Banner */}
-        <div className={`transition-opacity duration-300 px-4 py-2 rounded-md text-white font-medium ${warning ? 'bg-red-600 opacity-100' : 'opacity-0 hidden'}`}>
-          {warning}
-        </div>
+        {/* Warning moved out of the header into the center-top toast below. */}
 
         <div className="flex items-center space-x-6">
           <div className={`text-xl font-mono font-bold ${isTimeLow ? 'text-red-600' : 'text-white'}`}>
@@ -302,6 +313,41 @@ const ExamRoom = () => {
           </button>
         </div>
       </header>
+
+      {/* Zero-trust warning toast (center-top). Presentation only — driven by
+          the existing `warning` string. key={warning} remounts it so the
+          slide-in + progress bar replay on each new violation. */}
+      {warning && (
+        <div key={warning} className="fixed left-1/2 top-20 z-[60] w-[min(92vw,440px)] -translate-x-1/2">
+          <div
+            className={`exam-warn-toast overflow-hidden rounded-xl border-l-4 bg-white shadow-2xl ring-1 ring-black/5 ${warnTheme.border}`}
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="flex items-start gap-3 p-4">
+              <div className={`mt-0.5 shrink-0 ${warnTheme.icon}`}>
+                {isFullscreenWarn ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <path d="M3 3l18 18M10.6 5.1A9.8 9.8 0 0 1 12 5c5 0 9 4.5 9 7a12 12 0 0 1-2.2 3.2M6.6 6.6A12 12 0 0 0 3 12c0 2.5 4 7 9 7a9.5 9.5 0 0 0 4-.9M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                  </svg>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className={`font-semibold ${warnTheme.title}`}>{warnTitle}</p>
+                <p className="text-sm text-gray-600">{warnSubtitle}</p>
+                <p className="mt-0.5 text-xs text-gray-400">This action has been logged.</p>
+              </div>
+            </div>
+            <div className="h-1 w-full bg-gray-100">
+              <div className={`exam-warn-bar h-full ${warnTheme.bar}`} style={{ animationDuration: `${warnDurationMs}ms` }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Areas */}
       <div className="flex-1 mt-16 flex flex-row overflow-hidden">
