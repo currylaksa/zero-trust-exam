@@ -61,24 +61,28 @@ const ExamRoom = () => {
     return () => { isMounted = false; };
   }, [sessionId, navigate]);
 
+  // Re-enter fullscreen. MUST be called from a user gesture (click/keypress) —
+  // the browser rejects requestFullscreen() outside transient user activation,
+  // which is why a timer-based "auto-restore" silently fails.
+  const enterFullScreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (e) {
+      console.warn("Fullscreen request failed", e);
+    }
+  }, []);
+
   // Effect 1: Fullscreen Enforcer
   useEffect(() => {
-    const requestFullScreen = async () => {
-      try {
-        if (!document.fullscreenElement) {
-          await document.documentElement.requestFullscreen();
-        }
-      } catch (e) {
-        console.warn("Fullscreen request failed", e);
-      }
-    };
-
-    // Request on mount
-    requestFullScreen();
+    // Request on mount (works only if arriving via a user gesture).
+    enterFullScreen();
 
     const handleFullscreenChange = async () => {
       if (!document.fullscreenElement) {
         lastFullscreenExitAt.current = Date.now();
+        // Persistent warning — stays until the student clicks to re-enter.
         setWarning('Warning: Fullscreen exit detected and logged');
         try {
           await API.post(`/sessions/${sessionId}/log`, {
@@ -86,11 +90,9 @@ const ExamRoom = () => {
             description: 'User exited fullscreen'
           });
         } catch { console.error('Failed to log fullscreen exit'); }
-        
-        setTimeout(() => {
-          setWarning('');
-          requestFullScreen();
-        }, 3000);
+      } else {
+        // Back in fullscreen — clear the fullscreen warning if it's showing.
+        setWarning(w => (w.includes('Fullscreen') ? '' : w));
       }
     };
 
@@ -101,7 +103,7 @@ const ExamRoom = () => {
         document.exitFullscreen().catch(() => {});
       }
     };
-  }, [sessionId]);
+  }, [sessionId, enterFullScreen]);
 
   // Effect 2: Tab visibility
   useEffect(() => {
@@ -283,9 +285,9 @@ const ExamRoom = () => {
   const awayMatch = warning.match(/(\d+)\s*seconds/);
   const warnTitle = isFullscreenWarn ? 'Fullscreen exited' : 'Tab switch detected';
   const warnSubtitle = isFullscreenWarn
-    ? 'Restoring proctored mode…'
+    ? 'Proctored mode requires fullscreen. Click below to return.'
     : (awayMatch ? `You were away for ${awayMatch[1]} seconds.` : 'You left the exam tab.');
-  const warnDurationMs = isFullscreenWarn ? 3000 : 5000;   // mirrors the effect timers
+  const warnDurationMs = isFullscreenWarn ? 0 : 5000;   // tab-switch toast auto-dismisses; fullscreen stays
   const warnTheme = isFullscreenWarn
     ? { border: 'border-red-500', icon: 'text-red-600', title: 'text-red-800', bar: 'bg-red-500' }
     : { border: 'border-amber-500', icon: 'text-amber-600', title: 'text-amber-900', bar: 'bg-amber-500' };
@@ -340,11 +342,21 @@ const ExamRoom = () => {
                 <p className={`font-semibold ${warnTheme.title}`}>{warnTitle}</p>
                 <p className="text-sm text-gray-600">{warnSubtitle}</p>
                 <p className="mt-0.5 text-xs text-gray-400">This action has been logged.</p>
+                {isFullscreenWarn && (
+                  <button
+                    onClick={enterFullScreen}
+                    className="mt-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
+                  >
+                    Return to fullscreen
+                  </button>
+                )}
               </div>
             </div>
-            <div className="h-1 w-full bg-gray-100">
-              <div className={`exam-warn-bar h-full ${warnTheme.bar}`} style={{ animationDuration: `${warnDurationMs}ms` }} />
-            </div>
+            {warnDurationMs > 0 && (
+              <div className="h-1 w-full bg-gray-100">
+                <div className={`exam-warn-bar h-full ${warnTheme.bar}`} style={{ animationDuration: `${warnDurationMs}ms` }} />
+              </div>
+            )}
           </div>
         </div>
       )}
