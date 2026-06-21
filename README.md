@@ -265,7 +265,7 @@ Production runs on a DigitalOcean droplet behind Nginx, with both the Node API a
 | **Author** | Chan Qing Yee |
 | **Supervisor** | Prof. Madya Ts. Dr. Siti Hajar Binti Othman |
 | **Institution** | Faculty of Computing, Universiti Teknologi Malaysia (UTM) |
-| **Competition** | DIGITEX 2026 — Grand Finalist |
+| **Competition** | DIGITEX 2026 — Grand Finalist (Silver Medal) |
 | **Live** | [secureexam-cqy.tech](https://secureexam-cqy.tech) · [1-min demo](https://youtu.be/nyrsI8Op4BY) |
 
 <div align="center">
