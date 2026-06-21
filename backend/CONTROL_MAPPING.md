@@ -7,9 +7,8 @@
 > walkthrough, week of 2026-05-25 to 2026-05-28).
 >
 > Until the backfill lands, the 25 prior controls are summarised by
-> category in [`Micron_Round2_FYP_Prep.md` §11](../Micron_Round2_FYP_Prep.md):
-> Authentication (5), Session (5), Browser lockdown (5), RBAC (4),
-> Audit & detection (7) — total 25.
+> category here: Authentication (5), Session (5), Browser lockdown (5),
+> RBAC (4), Audit & detection (7) — total 25.
 
 ---
 
