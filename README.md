@@ -99,7 +99,7 @@ The platform implements zero-trust controls across five categories, capped by **
 | 📋 **Audit & detection** | Activity logging, flagged-activity capture, audit-log review |
 | 🧠 **Control #26 — Continuous Behavioral Verification** ⭐ | Real-time, *advisory* anomaly scoring of every active session |
 
-> Detailed control-by-control mapping with source pointers lives in [`backend/CONTROL_MAPPING.md`](backend/CONTROL_MAPPING.md). Control #26 is fully documented there; the earlier controls are currently summarized by category.
+> Full control-by-control mapping (all 26) with source pointers lives in [`backend/CONTROL_MAPPING.md`](backend/CONTROL_MAPPING.md).
 
 ---
 
