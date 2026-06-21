@@ -5,7 +5,7 @@
 ### A Zero-Trust Online Examination Platform with AI Behavioral Anomaly Detection
 
 *Final Year Project · Faculty of Computing, Universiti Teknologi Malaysia*
-*DIGITEX 2026 Grand Finalist*
+*DIGITEX 2026 Grand Finalist · 🥈 Silver Medal*
 
 [![Live](https://img.shields.io/website?url=https%3A%2F%2Fsecureexam-cqy.tech&up_message=online&down_message=offline&label=secureexam-cqy.tech&style=for-the-badge)](https://secureexam-cqy.tech)
 [![Demo](https://img.shields.io/badge/▶_1--min_demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/nyrsI8Op4BY)
