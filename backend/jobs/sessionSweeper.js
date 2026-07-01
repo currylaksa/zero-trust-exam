@@ -12,6 +12,10 @@ function startSessionSweeper() {
         `SELECT session_id, user_id, exam_id, status
          FROM ExamSession
          WHERE status IN ('in_progress', 'flagged')
+           -- end_time is only set once finalizeSession runs; skipping already-
+           -- finalized sessions stops flagged ones (which stay 'flagged') from
+           -- being re-swept and re-alerted on every cycle.
+           AND end_time IS NULL
            AND last_heartbeat IS NOT NULL
            AND TIMESTAMPDIFF(MINUTE, last_heartbeat, NOW()) >= 3`
       );
